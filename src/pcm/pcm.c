@@ -96,7 +96,7 @@ standard C open function - see 'man 2 open'). In non-blocked behaviour,
 these I/O functions never stops, they return -EAGAIN error code, when no
 data can be transferred (the ring buffer is full in our case). In blocked
 behaviour, these I/O functions stop and wait until there is a room in the
-ring buffer (playback) or until there are a new samples (capture). The ALSA
+ring buffer (playback) or until there are new samples (capture). The ALSA
 implementation can be found in the \ref alsa_pcm_rw section.
 
 \subsection pcm_transfer_event Event waiting routines
@@ -351,9 +351,9 @@ enumeration.
 These parameters - #snd_pcm_sw_params_t can be modified at
 any time including the running state.
 
-\par Minimum available count of samples
+\par Minimum available count of frames
 
-This parameter controls the wakeup point. If the count of available samples
+This parameter controls the wakeup point. If the count of available frames
 is equal or greater than this value, then application will be activated.
 
 \par Timestamp mode
@@ -372,29 +372,29 @@ is ignored by device. Usually, this value is set to one (no align).
 \par Start threshold
 
 The start threshold parameter is used to determine the start point in
-stream. For playback, if samples in ring buffer is equal or greater than
-the start threshold parameters and the stream is not running, the stream will
-be started automatically from the device. For capture, if the application wants
-to read count of samples equal or greater then the stream will be started.
-If you want to use explicit start (#snd_pcm_start), you can
-set this value greater than ring buffer size (in samples), but use the
-constant MAXINT is not a bad idea.
+stream. For playback, if the frame count in the ring buffer is equal or greater
+than the start threshold parameter and the stream is not running, the stream
+will be started automatically from the device. For capture, if the application
+wants to read count of frames equal or greater then the stream will be started.
+If you want to use explicit start (#snd_pcm_start), you can set this value
+greater than the ring buffer size (in frames). For that simply using a large
+constant such as LONG_MAX or the boundary value is not a bad idea.
 
 \par Stop threshold
 
 Similarly, the stop threshold parameter is used to automatically stop
-the running stream, when the available samples crosses this boundary.
+the running stream, when the available frames crosses this boundary.
 It means, for playback, the empty samples in ring buffer and for capture,
 the filled (used) samples in ring buffer.
 
 \par Silence threshold
 
-The silence threshold specifies count of samples filled with silence
-ahead of the current application pointer for playback. It is usable
-for applications when an overrun is possible (like tasks depending on
-network I/O etc.). If application wants to manage the ahead samples itself,
-the #snd_pcm_rewind() function allows to forget the last
-samples in the stream.
+The silence threshold specifies the count of frames before an underrun when the
+buffer gets filled with frames of silence according to the silence size parameter
+ahead of the current application pointer for playback. It is usable for applications
+when an underrun is possible (like tasks depending on network I/O etc.). If
+application wants to manage the ahead samples itself, the #snd_pcm_rewind() function
+allows to forget the last samples in the stream.
 
 \section pcm_status Obtaining stream status
 
@@ -402,11 +402,11 @@ The stream status is stored in #snd_pcm_status_t structure.
 These parameters can be obtained: the current stream state -
 #snd_pcm_status_get_state(), timestamp of trigger -
 #snd_pcm_status_get_trigger_tstamp(), timestamp of last
-pointer update #snd_pcm_status_get_tstamp(), delay in samples -
-#snd_pcm_status_get_delay(), available count in samples -
-#snd_pcm_status_get_avail(), maximum available samples -
+pointer update #snd_pcm_status_get_tstamp(), delay in frames -
+#snd_pcm_status_get_delay(), available count in frames -
+#snd_pcm_status_get_avail(), maximum available frames -
 #snd_pcm_status_get_avail_max(), ADC over-range count in
-samples - #snd_pcm_status_get_overrange(). The last two
+frames - #snd_pcm_status_get_overrange(). The last two
 parameters - avail_max and overrange are reset to zero after the status
 call.
 
@@ -414,7 +414,7 @@ call.
 
 <p>
 The function #snd_pcm_avail_update() updates the current
-available count of samples for writing (playback) or filled samples for
+available count of frames for writing (playback) or filled frames for
 reading (capture). This call is mandatory for updating actual r/w pointer.
 Using standalone, it is a light method to obtain current stream position,
 because it does not require the user <-> kernel context switch, but the value
@@ -427,10 +427,10 @@ The function #snd_pcm_avail() reads the current hardware pointer
 in the ring buffer from hardware and calls #snd_pcm_avail_update() then.
 </p>
 <p>
-The function #snd_pcm_delay() returns the delay in samples.
-For playback, it means count of samples in the ring buffer before
-the next sample will be sent to DAC. For capture, it means count of samples
-in the ring buffer before the next sample will be captured from ADC. It works
+The function #snd_pcm_delay() returns the delay in frames.
+For playback, it means count of frames in the ring buffer before
+the next frames will be sent to DAC. For capture, it means count of frames
+in the ring buffer before the next frames will be captured from ADC. It works
 only when the stream is in the running or draining (playback only) state.
 Note that this function does not update the current r/w pointer for applications,
 so the function #snd_pcm_avail_update() must be called afterwards
@@ -894,6 +894,7 @@ int snd_pcm_info(snd_pcm_t *pcm, snd_pcm_info_t *info)
  * \param pcm PCM handle
  * \param params Configuration space definition container
  * \return 0 on success otherwise a negative error code
+ * \retval -EBADFD no hardware configuration is set
  */
 int snd_pcm_hw_params_current(snd_pcm_t *pcm, snd_pcm_hw_params_t *params)
 {
@@ -960,6 +961,8 @@ int snd_pcm_hw_params(snd_pcm_t *pcm, snd_pcm_hw_params_t *params)
 /** \brief Remove PCM hardware configuration and free associated resources
  * \param pcm PCM handle
  * \return 0 on success otherwise a negative error code
+ *
+ * The function will also report success if no configuration is set.
  */
 int snd_pcm_hw_free(snd_pcm_t *pcm)
 {
@@ -1808,6 +1811,12 @@ static int __snd_pcm_poll_descriptors(snd_pcm_t *pcm, struct pollfd *pfds,
  * corresponding FD_SET arrays and demangle events using
  * \link ::snd_pcm_poll_descriptors_revents() \endlink .
  *
+ * It is guaranteed that for the given PCM handle, the output poll
+ * descriptor structs (and their count) will not change after
+ * hardware and software parameters setup. Thus it is valid to call
+ * the function once when all parameters are set and reuse its output
+ * for the lifetime of the stream parameters.
+ *
  * The function is thread-safe when built with the proper option.
  */
 int snd_pcm_poll_descriptors(snd_pcm_t *pcm, struct pollfd *pfds, unsigned int space)
@@ -1842,6 +1851,13 @@ static int __snd_pcm_poll_revents(snd_pcm_t *pcm, struct pollfd *pfds,
  *
  * Note: Even if multiple poll descriptors are used (i.e. pfds > 1),
  * this function returns only a single event.
+ *
+ * The passed in count of poll descriptors must be equal to
+ * \link ::snd_pcm_poll_descriptors_count() \endlink and the passed in array
+ * must match the array returned by \link ::snd_pcm_poll_descriptors() \endlink
+ * (in its full length and original order) with the revent fields updated
+ * according to the poll() result. This function will not modify the file
+ * descriptor or event field of any element of the given poll descriptor array.
  *
  * The function is thread-safe when built with the proper option.
  */
@@ -2070,10 +2086,16 @@ static const char *const snd_pcm_type_names[] = {
 
 static const char *const snd_pcm_subformat_names[] = {
 	SUBFORMAT(STD), 
+	SUBFORMAT(MSBITS_MAX),
+	SUBFORMAT(MSBITS_20),
+	SUBFORMAT(MSBITS_24),
 };
 
 static const char *const snd_pcm_subformat_descriptions[] = {
 	SUBFORMATD(STD, "Standard"), 
+	SUBFORMATD(MSBITS_MAX, "Maximum based on PCM format"),
+	SUBFORMATD(MSBITS_20, "20 most significant bits"),
+	SUBFORMATD(MSBITS_24, "24 most significant bits"),
 };
 
 static const char *const snd_pcm_start_mode_names[] = {
@@ -2195,6 +2217,30 @@ const char *snd_pcm_subformat_description(const snd_pcm_subformat_t subformat)
 	if (subformat > SND_PCM_SUBFORMAT_LAST)
 		return NULL;
 	return snd_pcm_subformat_descriptions[subformat];
+}
+
+/**
+ * \brief get PCM sample subformat from name
+ * \param name PCM sample subformat name (case insensitive)
+ * \return PCM sample subformat
+ */
+snd_pcm_subformat_t snd_pcm_subformat_value(const char* name)
+{
+	snd_pcm_subformat_t subformat;
+
+	for (subformat = 0; subformat <= SND_PCM_SUBFORMAT_LAST; subformat++) {
+		if (snd_pcm_subformat_names[subformat] &&
+		    !strcasecmp(name, snd_pcm_subformat_names[subformat]))
+			return subformat;
+	}
+
+	for (subformat = 0; subformat <= SND_PCM_SUBFORMAT_LAST; subformat++) {
+		if (snd_pcm_subformat_descriptions[subformat] &&
+		    !strcasecmp(name, snd_pcm_subformat_descriptions[subformat]))
+			return subformat;
+	}
+
+	return SND_PCM_SUBFORMAT_UNKNOWN;
 }
 
 /**
@@ -3899,6 +3945,11 @@ int snd_pcm_hw_params_get_fifo_size(const snd_pcm_hw_params_t *params)
  *
  * The configuration space will be filled with all possible ranges
  * for the PCM device.
+ *
+ * Note that the configuration space may be constrained by the
+ * currently installed configuration on the PCM device. To remove
+ * any constrains, free the configuration with #snd_pcm_hw_free
+ * first.
  */
 int snd_pcm_hw_params_any(snd_pcm_t *pcm, snd_pcm_hw_params_t *params)
 {
@@ -4465,7 +4516,7 @@ EXPORT_SYMBOL int INTERNAL(snd_pcm_hw_params_get_subformat)(const snd_pcm_hw_par
 int snd_pcm_hw_params_get_subformat(const snd_pcm_hw_params_t *params, snd_pcm_subformat_t *subformat)
 #endif
 {
-	return snd_pcm_hw_param_get(params, SND_PCM_HW_PARAM_SUBFORMAT, subformat, NULL);
+	return snd_pcm_hw_param_get(params, SND_PCM_HW_PARAM_SUBFORMAT, (unsigned int *)subformat, NULL);
 }
 
 /**
@@ -4505,7 +4556,7 @@ EXPORT_SYMBOL int INTERNAL(snd_pcm_hw_params_set_subformat_first)(snd_pcm_t *pcm
 int snd_pcm_hw_params_set_subformat_first(snd_pcm_t *pcm, snd_pcm_hw_params_t *params, snd_pcm_subformat_t *subformat)
 #endif
 {
-	return snd_pcm_hw_param_set_first(pcm, params, SND_PCM_HW_PARAM_SUBFORMAT, subformat, NULL);
+	return snd_pcm_hw_param_set_first(pcm, params, SND_PCM_HW_PARAM_SUBFORMAT, (unsigned int *)subformat, NULL);
 }
 
 /**
@@ -4521,7 +4572,7 @@ EXPORT_SYMBOL int INTERNAL(snd_pcm_hw_params_set_subformat_last)(snd_pcm_t *pcm,
 int snd_pcm_hw_params_set_subformat_last(snd_pcm_t *pcm, snd_pcm_hw_params_t *params, snd_pcm_subformat_t *subformat)
 #endif
 {
-	return snd_pcm_hw_param_set_last(pcm, params, SND_PCM_HW_PARAM_SUBFORMAT, subformat, NULL);
+	return snd_pcm_hw_param_set_last(pcm, params, SND_PCM_HW_PARAM_SUBFORMAT, (unsigned int *)subformat, NULL);
 }
 
 /**
@@ -6844,6 +6895,10 @@ int snd_pcm_sw_params_get_silence_threshold(const snd_pcm_sw_params_t *params, s
  * underrun is nearer than silence threshold (see 
  * #snd_pcm_sw_params_set_silence_threshold)
  *
+ * When drain silence (see #snd_pcm_hw_params_get_drain_silence) is disabled,
+ * this will also apply for draining, i.e. silence is written also when the
+ * drain end is nearer than the silence threshold.
+ *
  * The special case is when silence size value is equal or greater than
  * boundary. The unused portion of the ring buffer (initial written samples
  * are untouched) is filled with silence at start. Later, only just processed
@@ -7670,7 +7725,8 @@ snd_pcm_sframes_t snd_pcm_write_areas(snd_pcm_t *pcm, const snd_pcm_channel_area
 			/* some plugins might automatically start the stream */
 			state = __snd_pcm_state(pcm);
 			if (state == SND_PCM_STATE_PREPARED &&
-			    hw_avail >= (snd_pcm_sframes_t) pcm->start_threshold) {
+			    hw_avail >= 0 &&
+			    (snd_pcm_uframes_t) hw_avail >= pcm->start_threshold) {
 				err = __snd_pcm_start(pcm);
 				if (err < 0)
 					goto _end;

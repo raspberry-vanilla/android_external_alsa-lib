@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_PREREQ(2.59)
-AC_INIT(alsa-lib, 1.2.10)
+AC_INIT(alsa-lib, 1.2.11)
 
 AC_CONFIG_SRCDIR([src/control/control.c])
 AC_CONFIG_MACRO_DIR([m4])
@@ -747,22 +747,24 @@ if test ! -L "$srcdir"/include/alsa ; then
   ln -sf . "$srcdir"/include/alsa
 fi
 
-AC_OUTPUT(Makefile doc/Makefile doc/pictures/Makefile doc/doxygen.cfg \
-	  include/Makefile include/sound/Makefile include/sound/uapi/Makefile \
-	  src/Versions src/Makefile \
-          src/control/Makefile src/mixer/Makefile \
-	  src/pcm/Makefile src/pcm/scopes/Makefile \
-	  src/rawmidi/Makefile src/timer/Makefile \
-          src/hwdep/Makefile src/seq/Makefile src/ucm/Makefile \
-          src/alisp/Makefile src/topology/Makefile \
-	  src/conf/Makefile \
-	  src/conf/cards/Makefile \
-	  src/conf/ctl/Makefile \
-	  src/conf/pcm/Makefile \
-	  modules/Makefile modules/mixer/Makefile modules/mixer/simple/Makefile \
-	  alsalisp/Makefile aserver/Makefile \
-	  test/Makefile test/lsb/Makefile \
-	  utils/Makefile utils/alsa-lib.spec utils/alsa.pc utils/alsa-topology.pc)
+AC_CONFIG_FILES(Makefile doc/Makefile doc/pictures/Makefile doc/doxygen.cfg \
+		include/Makefile include/sound/Makefile include/sound/uapi/Makefile \
+		src/Versions.in src/Makefile \
+		src/control/Makefile src/mixer/Makefile \
+		src/pcm/Makefile src/pcm/scopes/Makefile \
+		src/rawmidi/Makefile src/timer/Makefile \
+		src/hwdep/Makefile src/seq/Makefile src/ucm/Makefile \
+		src/alisp/Makefile src/topology/Makefile \
+		src/conf/Makefile \
+		src/conf/cards/Makefile \
+		src/conf/ctl/Makefile \
+		src/conf/pcm/Makefile \
+		modules/Makefile modules/mixer/Makefile modules/mixer/simple/Makefile \
+		alsalisp/Makefile aserver/Makefile \
+		test/Makefile test/lsb/Makefile \
+		utils/Makefile utils/alsa-lib.spec utils/alsa.pc utils/alsa-topology.pc)
+
+AC_OUTPUT()
 
 dnl Create asoundlib.h dynamically according to configure options
 echo "Creating asoundlib.h..."
