@@ -22,6 +22,7 @@ cc_library_shared {
         "-Wno-pointer-arith",
         "-Wno-pointer-bool-conversion",
         "-Wno-sign-compare",
+        "-Wno-single-bit-bitfield-constant-conversion",
         "-Wno-unused-function",
         "-Wno-unused-const-variable",
         "-Wno-unused-parameter",
