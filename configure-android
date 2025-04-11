@@ -1,0 +1,62 @@
+#!/bin/bash
+
+#
+# Copyright (C) 2025 KonstaKANG
+#
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+
+if [ ! -d "$ANDROID_NDK_HOME" ]; then
+  echo "ANDROID_NDK_HOME environment variable is not properly set!"
+  exit 1
+fi
+
+export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+
+export TARGET=aarch64-linux-android
+export API=35
+export CC="$TOOLCHAIN/bin/clang --target=$TARGET$API"
+export CXX="$TOOLCHAIN/bin/clang++ --target=$TARGET$API"
+export AR=$TOOLCHAIN/bin/llvm-ar
+export AS=$CC
+export LD=$TOOLCHAIN/bin/ld
+export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+export STRIP=$TOOLCHAIN/bin/llvm-strip
+
+echo "Running autoconf..."
+touch ltconfig
+libtoolize --force --copy --automake
+aclocal
+autoheader
+automake --foreign --copy --add-missing
+touch depcomp
+autoconf
+
+ALSA_CONFIG=" \
+--disable-aload \
+--host=aarch64-linux \
+--with-configdir=/vendor/etc/alsa \
+--with-plugindir=/vendor/etc/alsa/lib/alsa-lib \
+--with-versioned=false"
+
+echo "Generating configuration..."
+echo "./configure $ALSA_CONFIG $TARGET"
+./configure $ALSA_CONFIG $TARGET
+
+cat > include/version.h <<EOF
+/*
+ *  version.h
+ */
+
+#define SND_LIB_MAJOR		$(cat version | cut -d . -f 1) /**< major number of library version */
+#define SND_LIB_MINOR		$(cat version | cut -d . -f 2) /**< minor number of library version */
+#define SND_LIB_SUBMINOR	$(cat version | cut -d . -f 3) /**< subminor number of library version */
+#define SND_LIB_EXTRAVER	1000000 /**< extra version number, used mainly for betas */
+/** library version */
+#define SND_LIB_VER(maj, min, sub) (((maj)<<16)|((min)<<8)|(sub))
+#define SND_LIB_VERSION SND_LIB_VER(SND_LIB_MAJOR, SND_LIB_MINOR, SND_LIB_SUBMINOR)
+/** library version (string) */
+#define SND_LIB_VERSION_STR	"$(cat version)"
+EOF
+
+exit 0
