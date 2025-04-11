@@ -1,0 +1,33 @@
+//
+// Copyright (C) 2025 KonstaKANG
+//
+// SPDX-License-Identifier: LGPL-2.1
+//
+
+cc_library_shared {
+    name: "libasound",
+    vendor: true,
+    export_include_dirs: [
+        "include",
+    ],
+    srcs: [
+        "src/**/*.c",
+    ],
+    exclude_srcs: [
+        "src/alisp/*.c",
+        "src/control/ctl_symbols_list.c",
+        "src/pcm/scopes/*.c",
+        "src/pcm/pcm_dmix_generic.c",
+        "src/pcm/pcm_dmix_i386.c",
+        "src/pcm/pcm_dmix_x86_64.c",
+        "src/pcm/pcm_symbols_list.c",
+    ],
+    cflags: [
+        "-O2",
+        "-DPIC",
+        "-fPIC",
+        "-Wno-pointer-arith",
+        "-Wno-pointer-bool-conversion",
+        "-Wno-single-bit-bitfield-constant-conversion",
+    ],
+}
