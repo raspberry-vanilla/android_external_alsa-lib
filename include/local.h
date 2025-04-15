@@ -30,6 +30,9 @@
 #include <string.h>
 #include <fcntl.h>
 #include <assert.h>
+#include <stdint.h>
+/* for timeval and timespec */
+#include <time.h>
 #ifdef HAVE_ENDIAN_H
 #include <endian.h>
 #elif defined(HAVE_SYS_ENDIAN_H)
@@ -187,6 +190,7 @@
 #include "hwdep.h"
 #include "control.h"
 #include "mixer.h"
+#include "ump_msg.h"
 #include "seq_event.h"
 #include "seq.h"
 
@@ -208,6 +212,7 @@
 #define snd_seq_result		sndrv_seq_result
 #define snd_seq_queue_skew	sndrv_seq_queue_skew
 #define snd_seq_ev_queue_control	sndrv_seq_ev_queue_control
+#define snd_seq_ev_ump_notify	sndrv_seq_ev_ump_notify
 #define snd_seq_client_t	sndrv_seq_client_t
 #define snd_seq_client_type_t	sndrv_seq_client_type_t
 
@@ -262,6 +267,7 @@ int _snd_safe_strtod(const char *str, double *val);
 int snd_send_fd(int sock, void *data, size_t len, int fd);
 int snd_receive_fd(int sock, void *data, size_t len, int *fd);
 size_t snd_strlcpy(char *dst, const char *src, size_t size);
+size_t snd_strlcat(char *dst, const char *src, size_t size);
 
 /*
  * error messages

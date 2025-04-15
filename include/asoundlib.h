@@ -38,6 +38,8 @@
 #include <poll.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <stdint.h>
+#include <time.h>
 #include <sys/endian.h>
 #ifndef __BYTE_ORDER
 #define __BYTE_ORDER BYTE_ORDER
@@ -69,6 +71,7 @@
 #include <alsa/hwdep.h>
 #include <alsa/control.h>
 #include <alsa/mixer.h>
+#include <alsa/ump_msg.h>
 #include <alsa/seq_event.h>
 #include <alsa/seq.h>
 #include <alsa/seqmid.h>

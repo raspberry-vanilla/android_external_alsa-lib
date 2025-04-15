@@ -25,6 +25,12 @@
  *
  */
 
+#if !defined(__ASOUNDLIB_H) && !defined(ALSA_LIBRARY_BUILD)
+/* don't use ALSA_LIBRARY_BUILD define in sources outside alsa-lib */
+#warning "use #include <alsa/asoundlib.h>, <alsa/error.h> should not be used directly"
+#include <alsa/asoundlib.h>
+#endif
+
 #ifndef __ALSA_ERROR_H
 #define __ALSA_ERROR_H
 
@@ -40,7 +46,6 @@ extern "C" {
 
 #define SND_ERROR_BEGIN				500000			/**< Lower boundary of sound error codes. */
 #define SND_ERROR_INCOMPATIBLE_VERSION		(SND_ERROR_BEGIN+0)	/**< Kernel/library protocols are not compatible. */
-#define SND_ERROR_ALISP_NIL			(SND_ERROR_BEGIN+1)	/**< Lisp encountered an error during acall. */
 
 const char *snd_strerror(int errnum);
 

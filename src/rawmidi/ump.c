@@ -872,11 +872,29 @@ void snd_ump_block_info_set_device(snd_ump_block_info_t *info, unsigned int devi
  *
  * This function is mostly used for setting the block ID to query.
  */
+#ifndef DOXYGEN
+EXPORT_SYMBOL void INTERNAL(snd_ump_block_info_set_block_id)(snd_ump_block_info_t *info,
+							     unsigned int id)
+#else
 void snd_ump_block_info_set_block_id(snd_ump_block_info_t *info,
 				     unsigned int id)
+#endif
 {
 	info->block_id = id;
 }
+
+#ifndef DOXYGEN
+EXPORT_SYMBOL void INTERNAL(snd_ump_block_info_set_block_id_old)
+				(snd_ump_block_info_t *info, unsigned int id)
+{
+	return INTERNAL(snd_ump_block_info_set_block_id)(info, id);
+}
+#endif
+
+#ifndef DOC_HIDDEN
+use_symbol_version(__snd_ump_block_info_set_block_id_old, snd_ump_block_info_set_block_id, ALSA_1.2.10);
+use_default_symbol_version(__snd_ump_block_info_set_block_id, snd_ump_block_info_set_block_id, ALSA_1.2.13);
+#endif /* DOC_HIDDEN */
 
 /**
  * \brief set activeness to snd_ump_block_info_t structure

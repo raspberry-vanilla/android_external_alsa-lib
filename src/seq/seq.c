@@ -1356,7 +1356,7 @@ int snd_seq_set_input_buffer_size(snd_seq_t *seq, size_t size)
 	if (size != seq->ibufsize) {
 		char *newbuf;
 		/* use ump event size for avoiding reallocation at switching */
-		newbuf = calloc(sizeof(snd_seq_ump_event_t), size);
+		newbuf = calloc(size, sizeof(snd_seq_ump_event_t));
 		if (newbuf == NULL)
 			return -ENOMEM;
 		free(seq->ibuf);
@@ -1870,7 +1870,7 @@ int snd_seq_client_info_get_ump_groupless_enabled(const snd_seq_client_info_t *i
 int snd_seq_client_info_get_ump_conversion(const snd_seq_client_info_t *info)
 {
 	assert(info);
-	return info->midi_version;
+	return !(info->group_filter & SNDRV_SEQ_FILTER_NO_CONVERT);
 }
 
 /**

@@ -1669,17 +1669,19 @@ int snd_pcm_hw_open_fd(snd_pcm_t **pcmp, const char *name, int fd,
 	if (SNDRV_PROTOCOL_VERSION(2, 0, 9) <= ver) {
 		struct timespec timespec;
 		if (clock_gettime(CLOCK_MONOTONIC, &timespec) == 0) {
-			int on = SNDRV_PCM_TSTAMP_TYPE_MONOTONIC;
-			if (ioctl(fd, SNDRV_PCM_IOCTL_TTSTAMP, &on) < 0) {
-				ret = -errno;
-				SNDMSG("TTSTAMP failed");
-				return ret;
+			if (!(mode & SND_PCM_APPEND)) {
+				int on = SNDRV_PCM_TSTAMP_TYPE_MONOTONIC;
+				if (ioctl(fd, SNDRV_PCM_IOCTL_TTSTAMP, &on) < 0) {
+					ret = -errno;
+					SNDMSG("TTSTAMP failed");
+					return ret;
+				}
 			}
 			tstamp_type = SND_PCM_TSTAMP_TYPE_MONOTONIC;
 		}
 	} else
 #endif
-	  if (SNDRV_PROTOCOL_VERSION(2, 0, 5) <= ver) {
+	  if (SNDRV_PROTOCOL_VERSION(2, 0, 5) <= ver && !(mode & SND_PCM_APPEND)) {
 		int on = 1;
 		if (ioctl(fd, SNDRV_PCM_IOCTL_TSTAMP, &on) < 0) {
 			ret = -errno;

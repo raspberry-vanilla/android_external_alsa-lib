@@ -552,7 +552,7 @@ int snd_seq_create_ump_endpoint(snd_seq_t *seq,
 	if (!seq->ump_ep->version)
 		seq->ump_ep->version = SND_UMP_EP_INFO_DEFAULT_VERSION;
 
-	if (info->name) {
+	if (info->name[0]) {
 		err = snd_seq_set_client_name(seq, (const char *)info->name);
 		if (err < 0)
 			goto error_free;
@@ -570,23 +570,20 @@ int snd_seq_create_ump_endpoint(snd_seq_t *seq,
 	snd_seq_port_info_set_port_specified(pinfo, 1);
 	snd_seq_port_info_set_name(pinfo, "MIDI 2.0");
 	snd_seq_port_info_set_capability(pinfo,
-					 SNDRV_SEQ_PORT_CAP_READ |
-					 SNDRV_SEQ_PORT_CAP_SYNC_READ |
-					 SNDRV_SEQ_PORT_CAP_SUBS_READ |
-					 SNDRV_SEQ_PORT_CAP_WRITE |
-					 SNDRV_SEQ_PORT_CAP_SYNC_WRITE |
-					 SNDRV_SEQ_PORT_CAP_SUBS_WRITE |
-					 SNDRV_SEQ_PORT_CAP_DUPLEX);
+					 SND_SEQ_PORT_CAP_UMP_ENDPOINT |
+					 SND_SEQ_PORT_CAP_READ |
+					 SND_SEQ_PORT_CAP_SYNC_READ |
+					 SND_SEQ_PORT_CAP_SUBS_READ |
+					 SND_SEQ_PORT_CAP_WRITE |
+					 SND_SEQ_PORT_CAP_SYNC_WRITE |
+					 SND_SEQ_PORT_CAP_SUBS_WRITE |
+					 SND_SEQ_PORT_CAP_DUPLEX);
 	snd_seq_port_info_set_type(pinfo,
 				   SND_SEQ_PORT_TYPE_MIDI_GENERIC |
-				   SNDRV_SEQ_PORT_TYPE_MIDI_UMP |
+				   SND_SEQ_PORT_TYPE_MIDI_UMP |
 				   SND_SEQ_PORT_TYPE_APPLICATION |
-				   SNDRV_SEQ_PORT_TYPE_PORT);
-	snd_seq_port_info_set_ump_group(pinfo,
-					SND_SEQ_PORT_TYPE_MIDI_GENERIC |
-				   SNDRV_SEQ_PORT_TYPE_MIDI_UMP |
-				   SND_SEQ_PORT_TYPE_APPLICATION |
-				   SNDRV_SEQ_PORT_TYPE_PORT);
+				   SND_SEQ_PORT_TYPE_PORT);
+	snd_seq_port_info_set_ump_group(pinfo, 0);
 	err = snd_seq_create_port(seq, pinfo);
 	if (err < 0) {
 		SNDERR("Failed to create MIDI 2.0 port\n");
@@ -635,7 +632,6 @@ static void update_group_ports(snd_seq_t *seq, snd_ump_endpoint_info_t *ep)
 		char blknames[64];
 		char name[64];
 		unsigned int caps = 0;
-		int len;
 
 		blknames[0] = 0;
 		for (b = 0; b < ep->num_blocks; b++) {
@@ -646,36 +642,32 @@ static void update_group_ports(snd_seq_t *seq, snd_ump_endpoint_info_t *ep)
 			    i >= bp->first_group + bp->num_groups)
 				continue;
 			switch (bp->direction) {
-			case SNDRV_UMP_DIR_INPUT: /* sink, receiver */
-				caps |= SNDRV_SEQ_PORT_CAP_WRITE |
-					SNDRV_SEQ_PORT_CAP_SYNC_WRITE |
-					SNDRV_SEQ_PORT_CAP_SUBS_WRITE;
+			case SND_UMP_DIR_INPUT: /* sink, receiver */
+				caps |= SND_SEQ_PORT_CAP_WRITE |
+					SND_SEQ_PORT_CAP_SYNC_WRITE |
+					SND_SEQ_PORT_CAP_SUBS_WRITE;
 				break;
-			case SNDRV_UMP_DIR_OUTPUT: /* source, transmitter */
-				caps |= SNDRV_SEQ_PORT_CAP_READ |
-					SNDRV_SEQ_PORT_CAP_SYNC_READ |
-					SNDRV_SEQ_PORT_CAP_SUBS_READ;
+			case SND_UMP_DIR_OUTPUT: /* source, transmitter */
+				caps |= SND_SEQ_PORT_CAP_READ |
+					SND_SEQ_PORT_CAP_SYNC_READ |
+					SND_SEQ_PORT_CAP_SUBS_READ;
 				break;
-			case SNDRV_UMP_DIR_BIDIRECTION:
-				caps |= SNDRV_SEQ_PORT_CAP_READ |
-					SNDRV_SEQ_PORT_CAP_SYNC_READ |
-					SNDRV_SEQ_PORT_CAP_SUBS_READ |
-					SNDRV_SEQ_PORT_CAP_WRITE |
-					SNDRV_SEQ_PORT_CAP_SYNC_WRITE |
-					SNDRV_SEQ_PORT_CAP_SUBS_WRITE |
-					SNDRV_SEQ_PORT_CAP_DUPLEX;
+			case SND_UMP_DIR_BIDIRECTION:
+				caps |= SND_SEQ_PORT_CAP_READ |
+					SND_SEQ_PORT_CAP_SYNC_READ |
+					SND_SEQ_PORT_CAP_SUBS_READ |
+					SND_SEQ_PORT_CAP_WRITE |
+					SND_SEQ_PORT_CAP_SYNC_WRITE |
+					SND_SEQ_PORT_CAP_SUBS_WRITE |
+					SND_SEQ_PORT_CAP_DUPLEX;
 				break;
 			}
 
-			if (!*bp->name)
+			if (bp->name[0] == '\0')
 				continue;
-			len = strlen(blknames);
-			if (len)
-				snprintf(blknames + len, sizeof(blknames) - len,
-					 ", %s", bp->name);
-			else
-				snd_strlcpy(blknames, (const char *)bp->name,
-					    sizeof(blknames));
+			if (blknames[0])
+				snd_strlcat(blknames, ", ", sizeof(blknames));
+			snd_strlcat(blknames, (const char *)bp->name, sizeof(blknames));
 		}
 
 		if (!*blknames)

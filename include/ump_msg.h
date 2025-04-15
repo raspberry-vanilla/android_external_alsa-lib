@@ -6,18 +6,26 @@
  * API library for ALSA rawmidi/UMP interface
  */
 
+#if !defined(__ASOUNDLIB_H) && !defined(ALSA_LIBRARY_BUILD)
+/* don't use ALSA_LIBRARY_BUILD define in sources outside alsa-lib */
+#warning "use #include <alsa/asoundlib.h>, <alsa/ump_msg.h> should not be used directly"
+#include <alsa/asoundlib.h>
+#endif
+
 #ifndef __ALSA_UMP_MSG_H
 #define __ALSA_UMP_MSG_H
-
-#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#if __BYTE_ORDER != __LITTLE_ENDIAN && __BYTE_ORDER != __BIG_ENDIAN
+#error "Endianness check failed!"
+#endif
+
 /** general UMP packet header in 32bit word */
 typedef struct _snd_ump_msg_hdr {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -36,7 +44,7 @@ typedef struct _snd_ump_msg_hdr {
 
 /** MIDI 1.0 Note Off / Note On (32bit) */
 typedef struct _snd_ump_msg_midi1_note {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -55,7 +63,7 @@ typedef struct _snd_ump_msg_midi1_note {
 
 /** MIDI 1.0 Poly Pressure (32bit) */
 typedef struct _snd_ump_msg_midi1_paf {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -74,7 +82,7 @@ typedef struct _snd_ump_msg_midi1_paf {
 
 /** MIDI 1.0 Control Change (32bit) */
 typedef struct _snd_ump_msg_midi1_cc {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -93,7 +101,7 @@ typedef struct _snd_ump_msg_midi1_cc {
 
 /** MIDI 1.0 Program Change (32bit) */
 typedef struct _snd_ump_msg_midi1_program {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -112,7 +120,7 @@ typedef struct _snd_ump_msg_midi1_program {
 
 /** MIDI 1.0 Channel Pressure (32bit) */
 typedef struct _snd_ump_msg_midi1_caf {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -131,7 +139,7 @@ typedef struct _snd_ump_msg_midi1_caf {
 
 /** MIDI 1.0 Pitch Bend (32bit) */
 typedef struct _snd_ump_msg_midi1_pitchbend {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -150,7 +158,7 @@ typedef struct _snd_ump_msg_midi1_pitchbend {
 
 /** System Common and Real Time messages (32bit); no channel field */
 typedef struct snd_ump_msg_system {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status;		/**< Status */
@@ -189,7 +197,7 @@ enum {
 
 /** MIDI 2.0 Note Off / Note On (64bit) */
 typedef struct _snd_ump_msg_midi2_note {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -214,7 +222,7 @@ typedef struct _snd_ump_msg_midi2_note {
 
 /** MIDI 2.0 Poly Pressure (64bit) */
 typedef struct _snd_ump_msg_midi2_paf {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -237,7 +245,7 @@ typedef struct _snd_ump_msg_midi2_paf {
 
 /** MIDI 2.0 Per-Note Controller (64bit) */
 typedef struct _snd_ump_msg_midi2_per_note_cc {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -266,7 +274,7 @@ enum {
 
 /** MIDI 2.0 Per-Note Management (64bit) */
 typedef struct _snd_ump_msg_midi2_per_note_mgmt {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -289,7 +297,7 @@ typedef struct _snd_ump_msg_midi2_per_note_mgmt {
 
 /** MIDI 2.0 Control Change (64bit) */
 typedef struct _snd_ump_msg_midi2_cc {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -312,7 +320,7 @@ typedef struct _snd_ump_msg_midi2_cc {
 
 /** MIDI 2.0 Registered Controller (RPN) / Assignable Controller (NRPN) (64bit) */
 typedef struct _snd_ump_msg_midi2_rpn {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -335,7 +343,7 @@ typedef struct _snd_ump_msg_midi2_rpn {
 
 /** MIDI 2.0 Program Change (64bit) */
 typedef struct _snd_ump_msg_midi2_program {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -364,7 +372,7 @@ typedef struct _snd_ump_msg_midi2_program {
 
 /** MIDI 2.0 Channel Pressure (64bit) */
 typedef struct _snd_ump_msg_midi2_caf {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -385,7 +393,7 @@ typedef struct _snd_ump_msg_midi2_caf {
 
 /** MIDI 2.0 Pitch Bend (64bit) */
 typedef struct _snd_ump_msg_midi2_pitchbend {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -450,7 +458,7 @@ typedef union _snd_ump_msg_midi2 {
 
 /** Stream Message (generic) (128bit) */
 typedef struct _snd_ump_msg_stream_gen {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint16_t type:4;	/**< UMP packet type */
 	uint16_t format:2;	/**< Format */
 	uint16_t status:10;	/**< Status */
@@ -478,7 +486,7 @@ typedef union _snd_ump_msg_stream {
 
 /** Metadata / Text Message (128bit) */
 typedef struct _snd_ump_msg_flex_data_meta {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t format:2;	/**< Format */
@@ -501,7 +509,7 @@ typedef struct _snd_ump_msg_flex_data_meta {
 
 /** Set Tempo Message (128bit) */
 typedef struct _snd_ump_msg_set_tempo {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t format:2;	/**< Format */
@@ -530,7 +538,7 @@ typedef struct _snd_ump_msg_set_tempo {
 
 /** Set Time Signature Message (128bit) */
 typedef struct _snd_ump_msg_set_time_sig {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t format:2;	/**< Format */
@@ -565,7 +573,7 @@ typedef struct _snd_ump_msg_set_time_sig {
 
 /** Set Metronome Message (128bit) */
 typedef struct _snd_ump_msg_set_metronome {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t format:2;	/**< Format */
@@ -608,7 +616,7 @@ typedef struct _snd_ump_msg_set_metronome {
 
 /** Set Key Signature Message (128bit) */
 typedef struct _snd_ump_msg_set_key_sig {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t format:2;	/**< Format */
@@ -641,7 +649,7 @@ typedef struct _snd_ump_msg_set_key_sig {
 
 /** Set Chord Name Message (128bit) */
 typedef struct _snd_ump_msg_set_chord_name {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t format:2;	/**< Format */
@@ -782,7 +790,7 @@ typedef union _snd_ump_msg_mixed_data {
 
 /** Jitter Reduction Clock / Timestamp Message (32bit) */
 typedef struct _snd_ump_msg_jr_clock {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -799,7 +807,7 @@ typedef struct _snd_ump_msg_jr_clock {
 
 /** Delta Clockstamp Ticks Per Quarter Note (DCTPQ) (32bit) */
 typedef struct _snd_ump_msg_dctpq {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint8_t type:4;		/**< UMP packet type */
 	uint8_t group:4;	/**< UMP Group */
 	uint8_t status:4;	/**< Status */
@@ -816,7 +824,7 @@ typedef struct _snd_ump_msg_dctpq {
 
 /** Delta Clockstamp (DC) (32bit) */
 typedef struct _snd_ump_msg_dc {
-#ifdef SNDRV_BIG_ENDIAN_BITFIELD
+#if __BYTE_ORDER == __BIG_ENDIAN
 	uint32_t type:4;		/**< UMP packet type */
 	uint32_t group:4;		/**< UMP Group */
 	uint32_t status:4;		/**< Status */
@@ -1109,7 +1117,7 @@ static inline uint8_t snd_ump_sysex_msg_length(const uint32_t *ump)
  */
 static inline uint8_t snd_ump_get_byte(const uint32_t *ump, unsigned int offset)
 {
-#ifdef SNDRV_BIG_ENDIAN
+#if __BYTE_ORDER == __BIG_ENDIAN
 	return ((const uint8_t *)ump)[offset];
 #else
 	return ((const uint8_t *)ump)[(offset & ~3) | (3 - (offset & 3))];

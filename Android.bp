@@ -14,7 +14,6 @@ cc_library_shared {
         "src/**/*.c",
     ],
     exclude_srcs: [
-        "src/alisp/*.c",
         "src/control/ctl_symbols_list.c",
         "src/pcm/scopes/*.c",
         "src/pcm/pcm_dmix_generic.c",

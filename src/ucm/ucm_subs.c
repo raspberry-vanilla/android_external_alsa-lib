@@ -20,7 +20,7 @@
  *  transition sequences, multiple client access and user defined use
  *  cases was kindly sponsored by Wolfson Microelectronics PLC.
  *
- *  Copyright (C) 2019 Red Hat Inc.
+ *  Copyright (C) 2019-2025 Red Hat Inc.
  *  Authors: Jaroslav Kysela <perex@perex.cz>
  */
 
@@ -29,6 +29,19 @@
 #include <sys/stat.h>
 #include <limits.h>
 #include <regex.h>
+
+/* capabilities string like "*a*b*c" will be used to check library extensions */
+/* use Needle like "*a*" or regex expression for a match */
+#define LIB_CAPS_STRING "*" "*"
+
+static unsigned char _hex_table[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
+
+static char *rval_lib_caps(snd_use_case_mgr_t *uc_mgr ATTRIBUTE_UNUSED)
+{
+	if (uc_mgr->conf_format < 8)
+		return NULL;
+	return strdup(LIB_CAPS_STRING);
+}
 
 static char *rval_open_name(snd_use_case_mgr_t *uc_mgr)
 {
@@ -504,20 +517,117 @@ static char *rval_env(snd_use_case_mgr_t *uc_mgr ATTRIBUTE_UNUSED, const char *i
 	return NULL;
 }
 
-static char *rval_sysfs(snd_use_case_mgr_t *uc_mgr ATTRIBUTE_UNUSED, const char *id)
+#define RANGE_TYPE_ASCII 0
+#define RANGE_TYPE_HEX   1
+
+static int parse_position(snd_config_t *config, const char *name, ssize_t *pos, bool optional)
+{
+	snd_config_t *d;
+	const char *s;
+	long v;
+
+	if (snd_config_search(config, name, &d)) {
+		if (optional) {
+			*pos = -1;
+			return 0;
+		}
+		uc_error("Unable to find field '%s'", name);
+		return -1;
+	}
+	if (!snd_config_get_integer(d, &v))
+		goto fin;
+	if (snd_config_get_string(d, &s))
+		return -1;
+	if (safe_strtol(s, &v)) {
+		uc_error("Unable to parse position '%s'", s);
+		return -1;
+	}
+fin:
+	*pos = v;
+	return 0;
+}
+
+static int parse_range(const char *cfg, int *type, ssize_t *pos, ssize_t *size)
+{
+	snd_config_t *config, *d;
+	int err, retval = 0;
+	const char *s;
+
+	err = snd_config_load_string(&config, cfg, 0);
+	if (err < 0) {
+		uc_error("The range arguments '%s' are invalid", cfg);
+		return -1;
+	}
+	if (snd_config_search(config, "type", &d)) {
+		*type = RANGE_TYPE_ASCII;
+	} else {
+		if (snd_config_get_string(d, &s))
+			goto null;
+		if (strcasecmp(s, "ascii") == 0) {
+			*type = RANGE_TYPE_ASCII;
+		} else if (strcasecmp(s, "hex") == 0) {
+			*type = RANGE_TYPE_HEX;
+		} else {
+			uc_error("Unknown range type '%s'", s);
+		}
+	}
+	*pos = 0;
+	*size = -1;
+	if (parse_position(config, "pos", pos, false) ||
+	    parse_position(config, "size", size, true)) {
+		retval = -1;
+		goto null;
+	}
+
+	if (*size <= 0)
+		*size = 1;
+	if (*pos < 0) {
+		uc_error("Invalid start position");
+		retval = -1;
+		goto null;
+	}
+
+null:
+	snd_config_delete(config);
+	return retval;
+}
+
+static char *rval_sysfs_main(snd_use_case_mgr_t *uc_mgr, const char *top_path, const char *id)
 {
 	char path[PATH_MAX], link[PATH_MAX + 1];
 	struct stat64 sb;
-	ssize_t len;
-	const char *e;
-	int fd;
+	ssize_t len, range_start = -1, range_size = -1;
+	const char *e, *s;
+	int fd, type = RANGE_TYPE_ASCII;
 
 	e = uc_mgr_sysfs_root();
 	if (e == NULL)
 		return NULL;
+	if (id[0] == '[') {
+		if (uc_mgr->conf_format < 8) {
+			uc_error("Sysfs ranges are supported in v8+ syntax");
+			return NULL;
+		}
+		s = strchr(id, ']');
+		if (s == NULL)
+			return NULL;
+		len = s - id - 1;
+		if ((size_t)(len - 1) > sizeof(link) - 1)
+			return NULL;
+		strncpy(link, id + 1, len);
+		link[len] = '\0';
+		if (parse_range(link, &type, &range_start, &range_size)) {
+			uc_error("sysfs: cannot parse hex range '%s'", link);
+			return NULL;
+		}
+		id = s + 1;
+	}
 	if (id[0] == '/')
 		id++;
-	snprintf(path, sizeof(path), "%s/%s", e, id);
+	if (top_path)
+		snprintf(path, sizeof(path), "%s/%s/%s", e, top_path, id);
+	else
+		snprintf(path, sizeof(path), "%s/%s", e, id);
 	if (lstat64(path, &sb) != 0)
 		return NULL;
 	if (S_ISLNK(sb.st_mode)) {
@@ -542,16 +652,62 @@ static char *rval_sysfs(snd_use_case_mgr_t *uc_mgr ATTRIBUTE_UNUSED, const char 
 		uc_error("sysfs open failed for '%s' (%d)", path, errno);
 		return NULL;
 	}
-	len = read(fd, path, sizeof(path)-1);
+	len = sizeof(path) - 1;
+	if (range_start > 0 && lseek(fd, range_start, SEEK_SET) != range_start) {
+		uc_error("sysfs seek failed (%d)", errno);
+		close(fd);
+		return NULL;
+	}
+	if (range_size > 0) {
+		if (range_size > len) {
+			uc_error("sysfs EOB for '%s'", path);
+			close(fd);
+			return NULL;
+		} else {
+			len = range_size;
+		}
+	}
+	len = read(fd, path, len);
 	close(fd);
 	if (len < 0) {
 		uc_error("sysfs unable to read value '%s' (%d)", path, errno);
 		return NULL;
 	}
+	if (type == RANGE_TYPE_HEX && range_start >= 0) {
+		char *m = malloc(len * 2 + 1);
+		ssize_t idx;
+		if (m == NULL)
+			return NULL;
+		for (idx = 0; idx < len; idx++) {
+			m[(idx * 2) + 0] = _hex_table[((unsigned char)path[idx]) >> 4];
+			m[(idx * 2) + 1] = _hex_table[((unsigned char)path[idx]) & 0x0f];
+		}
+		m[len * 2] = '\0';
+		return m;
+	}
 	while (len > 0 && path[len-1] == '\n')
 		len--;
 	path[len] = '\0';
 	return strdup(path);
+}
+
+static char *rval_sysfs(snd_use_case_mgr_t *uc_mgr, const char *id)
+{
+	return rval_sysfs_main(uc_mgr, NULL, id);
+}
+
+static char *rval_sysfs_card(snd_use_case_mgr_t *uc_mgr, const char *id)
+{
+	char top_path[32], *s;
+
+	if (uc_mgr->conf_format < 8) {
+		uc_error("sys-card is supported in v8+ syntax");
+		return NULL;
+	}
+	s = get_card_number(uc_mgr_get_master_ctl(uc_mgr));
+	snprintf(top_path, sizeof(top_path), "class/sound/card%s", s);
+	free(s);
+	return rval_sysfs_main(uc_mgr, top_path, id);
 }
 
 static char *rval_var(snd_use_case_mgr_t *uc_mgr, const char *id)
@@ -738,6 +894,7 @@ __std:
 			goto __std;
 		}
 		fcn2 = NULL;
+		MATCH_VARIABLE(value, "${LibCaps}", rval_lib_caps, false);
 		MATCH_VARIABLE(value, "${OpenName}", rval_open_name, false);
 		MATCH_VARIABLE(value, "${ConfLibDir}", rval_conf_libdir, false);
 		MATCH_VARIABLE(value, "${ConfTopDir}", rval_conf_topdir, false);
@@ -751,6 +908,7 @@ __std:
 		MATCH_VARIABLE(value, "${CardComponents}", rval_card_components, true);
 		MATCH_VARIABLE2(value, "${env:", rval_env, false);
 		MATCH_VARIABLE2(value, "${sys:", rval_sysfs, false);
+		MATCH_VARIABLE2(value, "${sys-card:", rval_sysfs_card, false);
 		MATCH_VARIABLE2(value, "${var:", rval_var, true);
 		MATCH_VARIABLE2(value, "${eval:", rval_eval, false);
 		MATCH_VARIABLE2(value, "${find-card:", rval_card_lookup, false);
