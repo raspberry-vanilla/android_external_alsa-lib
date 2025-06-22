@@ -29,4 +29,5 @@ cc_library_shared {
         "-Wno-pointer-bool-conversion",
         "-Wno-single-bit-bitfield-constant-conversion",
     ],
+    required: ["libasound-config"],
 }

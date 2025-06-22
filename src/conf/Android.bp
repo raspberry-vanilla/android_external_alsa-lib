@@ -1,0 +1,74 @@
+//
+// Copyright (C) 2025 KonstaKANG
+//
+// SPDX-License-Identifier: LGPL-2.1
+//
+
+prebuilt_defaults {
+    name: "libasound-config-defaults",
+    relative_install_path: "alsa",
+    vendor: true,
+}
+
+prebuilt_etc {
+    name: "libasound-config",
+    srcs: [
+        "alsa.conf",
+        "cards/aliases.conf",
+        "cards/vc4-hdmi.conf",
+        "ctl/default.conf",
+        "smixer.conf",
+    ],
+    dsts: [
+        "alsa.conf",
+        "cards/aliases.conf",
+        "cards/vc4-hdmi.conf",
+        "ctl/default.conf",
+        "smixer.conf",
+    ],
+    required: ["libasound-config-pcm"],
+    defaults: ["libasound-config-defaults"],
+}
+
+prebuilt_etc {
+    name: "libasound-config-pcm",
+    srcs: [
+        "pcm/center_lfe.conf",
+        "pcm/default.conf",
+        "pcm/dmix.conf",
+        "pcm/dpl.conf",
+        "pcm/dsnoop.conf",
+        "pcm/front.conf",
+        "pcm/hdmi.conf",
+        "pcm/iec958.conf",
+        "pcm/modem.conf",
+        "pcm/rear.conf",
+        "pcm/side.conf",
+        "pcm/surround21.conf",
+        "pcm/surround40.conf",
+        "pcm/surround41.conf",
+        "pcm/surround50.conf",
+        "pcm/surround51.conf",
+        "pcm/surround71.conf",
+    ],
+    dsts: [
+        "pcm/center_lfe.conf",
+        "pcm/default.conf",
+        "pcm/dmix.conf",
+        "pcm/dpl.conf",
+        "pcm/dsnoop.conf",
+        "pcm/front.conf",
+        "pcm/hdmi.conf",
+        "pcm/iec958.conf",
+        "pcm/modem.conf",
+        "pcm/rear.conf",
+        "pcm/side.conf",
+        "pcm/surround21.conf",
+        "pcm/surround40.conf",
+        "pcm/surround41.conf",
+        "pcm/surround50.conf",
+        "pcm/surround51.conf",
+        "pcm/surround71.conf",
+    ],
+    defaults: ["libasound-config-defaults"],
+}
