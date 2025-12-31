@@ -13,8 +13,8 @@
   GNU Lesser General Public License for more details.
 
   Authors: Mengdong Lin <mengdong.lin@intel.com>
-           Yao Jin <yao.jin@intel.com>
-           Liam Girdwood <liam.r.girdwood@linux.intel.com>
+	   Yao Jin <yao.jin@intel.com>
+	   Liam Girdwood <liam.r.girdwood@linux.intel.com>
 */
 
 #include "tplg_local.h"
@@ -237,7 +237,7 @@ int tplg_get_type(int asoc_type)
 	for (index = 0; index < tplg_table_items; index++)
 		if (tplg_table[index].tsoc == asoc_type)
 			return tplg_table[index].type;
-	SNDERR("uknown asoc type %d", asoc_type);
+	snd_error(TOPOLOGY, "uknown asoc type %d", asoc_type);
 	return -EINVAL;
 }
 
@@ -423,7 +423,10 @@ struct tplg_elem* tplg_elem_new_common(snd_tplg_t *tplg,
 
 	/* do we get name from cfg */
 	if (cfg) {
-		snd_config_get_id(cfg, &id);
+		if (snd_config_get_id(cfg, &id) < 0) {
+			free(elem);
+			return NULL;
+		}
 		snd_strlcpy(elem->id, id, SNDRV_CTL_ELEM_ID_NAME_MAXLEN);
 		elem->id[SNDRV_CTL_ELEM_ID_NAME_MAXLEN - 1] = 0;
 		/* as we insert new elem based on the index value, move index

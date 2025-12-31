@@ -70,6 +70,10 @@
 /* Have clock gettime */
 /* #undef HAVE_CLOCK_GETTIME */
 
+/* Define to 1 if you have the declaration of `closefrom', and to 0 if you
+   don't. */
+#define HAVE_DECL_CLOSEFROM 0
+
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #define HAVE_DLFCN_H 1
 
@@ -176,7 +180,7 @@
 #define PACKAGE_NAME "alsa-lib"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "alsa-lib 1.2.14"
+#define PACKAGE_STRING "alsa-lib 1.2.15.1"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "alsa-lib"
@@ -185,7 +189,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "1.2.14"
+#define PACKAGE_VERSION "1.2.15.1"
 
 /* Max number of cards */
 #define SND_MAX_CARDS 32
@@ -300,7 +304,7 @@
 
 
 /* sound library version string */
-#define VERSION "1.2.14"
+#define VERSION "1.2.15.1"
 
 /* compiled with versioned symbols */
 /* #undef VERSIONED_SYMBOLS */

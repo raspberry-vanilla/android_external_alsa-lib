@@ -73,7 +73,7 @@ static int set_variables(snd_use_case_mgr_t *uc_mgr, const char *data,
 	if (err < 0)
 		return err;
 	for (i = 1; i < match_size; i++) {
-		if (match[0].rm_so < 0 || match[0].rm_eo < 0)
+		if (match[i].rm_so < 0 || match[i].rm_eo < 0)
 			return 0;
 		s = extract_substring(data, &match[i]);
 		if (s == NULL)
@@ -98,24 +98,24 @@ int uc_mgr_define_regex(snd_use_case_mgr_t *uc_mgr, const char *name,
 	int err;
 
 	if (uc_mgr->conf_format < 3) {
-		uc_error("define regex is supported in v3+ syntax");
+		snd_error(UCM, "define regex is supported in v3+ syntax");
 		return -EINVAL;
 	}
 
 	if (snd_config_get_type(eval) != SND_CONFIG_TYPE_COMPOUND) {
-		uc_error("compound type expected for DefineRegex");
+		snd_error(UCM, "compound type expected for DefineRegex");
 		return -EINVAL;
 	}
 
 	err = get_string(eval, "String", &string);
 	if (err < 0) {
-		uc_error("DefineRegex error (String)");
+		snd_error(UCM, "DefineRegex error (String)");
 		return -EINVAL;
 	}
 
 	err = get_string(eval, "Regex", &regex_string);
 	if (err < 0) {
-		uc_error("DefineRegex error (Regex string)");
+		snd_error(UCM, "DefineRegex error (Regex string)");
 		return -EINVAL;
 	}
 
@@ -123,7 +123,7 @@ int uc_mgr_define_regex(snd_use_case_mgr_t *uc_mgr, const char *name,
 	if (err == -ENOENT) {
 		options = REG_EXTENDED;
 	} else if (err < 0) {
-		uc_error("DefineRegex error (Flags string)");
+		snd_error(UCM, "DefineRegex error (Flags string)");
 		return -EINVAL;
 	} else {
 		while (*flags_string) {
@@ -141,7 +141,7 @@ int uc_mgr_define_regex(snd_use_case_mgr_t *uc_mgr, const char *name,
 				options |= REG_NEWLINE;
 				break;
 			default:
-				uc_error("DefineRegex error (unknown flag '%c')", *flags_string);
+				snd_error(UCM, "DefineRegex error (unknown flag '%c')", *flags_string);
 				return -EINVAL;
 			}
 			flags_string++;
@@ -152,11 +152,12 @@ int uc_mgr_define_regex(snd_use_case_mgr_t *uc_mgr, const char *name,
 	if (err < 0)
 		return err;
 	err = regcomp(&re, s, options);
-	free(s);
 	if (err) {
-		uc_error("Regex '%s' compilation failed (code %d)", err);
+		snd_error(UCM, "Regex '%s' compilation failed (code %d)", s, err);
+		free(s);
 		return -EINVAL;
 	}
+	free(s);
 
 	err = uc_mgr_get_substituted_value(uc_mgr, &s, string);
 	if (err < 0) {

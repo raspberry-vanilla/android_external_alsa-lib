@@ -63,7 +63,7 @@ use case verbs for that sound card. i.e.:
 # Example master file for blah sound card
 # By Joe Blogs <joe@bloggs.org>
 
-Syntax 7
+Syntax 8
 
 # Use Case name for user interface
 Comment "Nice Abstracted Soundcard"
@@ -78,6 +78,31 @@ SectionUseCase."Voice Call" {
 SectionUseCase."HiFi" {
   File "hifi_blah"
   Comment "Play and record HiFi quality Music."
+}
+
+# Since Syntax 8, you can also use Config to specify configuration inline
+# instead of referencing an external file. Only one of File or Config can be used.
+
+SectionUseCase."Inline Example" {
+  Comment "Example with inline configuration"
+  Config {
+    SectionVerb {
+      EnableSequence [
+        cset "name='Power Save' off"
+      ]
+      DisableSequence [
+        cset "name='Power Save' on"
+      ]
+    }
+    SectionDevice."Speaker" {
+      EnableSequence [
+        cset "name='Speaker Switch' on"
+      ]
+      DisableSequence [
+        cset "name='Speaker Switch' off"
+      ]
+    }
+  }
 }
 
 # Define Value defaults
@@ -266,12 +291,164 @@ a whitespace between name and index (like 'Line 1') for the better
 readability. The device names 'Line 1' and 'Line1' are equal for
 this purpose.
 
+#### Automatic device index assignment (Syntax 8+)
+
+Starting with **Syntax 8**, device names can include a colon (':') character to enable
+automatic device index assignment. When a device name contains a colon, the UCM parser
+will automatically assign an available numeric index and remove everything after and
+including the colon character.
+
+The automatic assignment ensures that the generated device name is unique within the verb
+by finding the first available index starting from 1. If a name conflict is detected,
+the index is automatically incremented until a unique name is found (up to index 99).
+
+This feature is particularly useful for dynamically creating multiple instances of similar
+devices without manually managing index numbers. The text after the colon is required and
+serves as a descriptive identifier in the source configuration to help distinguish between
+devices, but is not part of the final device name.
+
+Example - Automatic HDMI device indexing:
+
+~~~{.html}
+SectionDevice."HDMI:primary" {
+  Comment "First HDMI output (will become HDMI1)"
+  EnableSequence [
+    cset "name='HDMI Switch' on"
+  ]
+  Value {
+    PlaybackPCM "hw:${CardId},3"
+  }
+}
+
+SectionDevice."HDMI:secondary" {
+  Comment "Second HDMI output (will become HDMI2)"
+  EnableSequence [
+    cset "name='HDMI2 Switch' on"
+  ]
+  Value {
+    PlaybackPCM "hw:${CardId},7"
+  }
+}
+~~~
+
+Example - Automatic Line device indexing with descriptive identifiers:
+
+~~~{.html}
+SectionDevice."Line:front" {
+  Comment "Front line input (will become Line1)"
+  EnableSequence [
+    cset "name='Front Line In Switch' on"
+  ]
+  Value {
+    CapturePCM "hw:${CardId},0"
+  }
+}
+
+SectionDevice."Line:rear" {
+  Comment "Rear line input (will become Line2)"
+  EnableSequence [
+    cset "name='Rear Line In Switch' on"
+  ]
+  Value {
+    CapturePCM "hw:${CardId},1"
+  }
+}
+~~~
+
+Example - Mixed manual and automatic indexing:
+
+~~~{.html}
+# Manually named device
+SectionDevice."Speaker" {
+  Comment "Main speaker output"
+  EnableSequence [
+    cset "name='Speaker Switch' on"
+  ]
+}
+
+# Auto-indexed devices with descriptive identifiers
+SectionDevice."Mic:digital" {
+  Comment "Digital microphone (will become Mic1)"
+  EnableSequence [
+    cset "name='Digital Mic Switch' on"
+  ]
+  Value {
+    CapturePCM "hw:${CardId},2"
+  }
+}
+
+SectionDevice."Mic:headphone" {
+  Comment "Headphone microphone (will become Mic2)"
+  EnableSequence [
+    cset "name='Headphone Mic Switch' on"
+  ]
+  Value {
+    CapturePCM "hw:${CardId},3"
+  }
+}
+~~~
+
 If EnableSequence/DisableSequence controls independent paths in the hardware
 it is also recommended to split playback and capture UCM devices and use
 the number suffixes. Example use case: Use the integrated microphone
 in the laptop instead the microphone in headphones.
 
 The preference of the devices is determined by the priority value (higher value = higher priority).
+
+#### Device ordering (Syntax 8+)
+
+Starting with **Syntax 8**, devices are automatically sorted based on their priority values.
+The sorting is performed at the end of device management processing, after device renaming
+and index assignment.
+
+The priority key selection order is:
+1. **Priority** - If this value exists, use it as the sorting key
+2. **PlaybackPriority** - If Priority doesn't exist but PlaybackPriority exists, use it
+3. **CapturePriority** - If neither Priority nor PlaybackPriority exist, use CapturePriority
+4. **Fallback** - If no priority value is defined, use the device name for alphabetical sorting
+
+Devices are sorted in **descending order** of priority (higher priority values appear first
+in the device list). When two devices have the same priority value, they are sorted
+alphabetically by device name.
+
+Example - Device priority ordering:
+
+~~~{.html}
+SectionDevice."Speaker" {
+  Comment "Internal speaker"
+  EnableSequence [
+    cset "name='Speaker Switch' on"
+  ]
+  Value {
+    PlaybackPriority 100
+    PlaybackPCM "hw:${CardId},0"
+  }
+}
+
+SectionDevice."Headphones" {
+  Comment "Headphone jack"
+  EnableSequence [
+    cset "name='Headphone Switch' on"
+  ]
+  Value {
+    PlaybackPriority 200
+    PlaybackPCM "hw:${CardId},1"
+  }
+}
+
+SectionDevice."HDMI" {
+  Comment "HDMI output"
+  EnableSequence [
+    cset "name='HDMI Switch' on"
+  ]
+  Value {
+    PlaybackPriority 150
+    PlaybackPCM "hw:${CardId},3"
+  }
+}
+~~~
+
+In this example, the device list will be ordered as: Headphones (200), HDMI (150), Speaker (100).
 
 See the SND_USE_CASE_MOD constants like #SND_USE_CASE_MOD_ECHO_REF for the full list of known modifiers.
 
@@ -284,6 +461,38 @@ the state of the controls to the /var tree and loads the previous state in the n
 boot).
 
 \image html ucm-seq-boot.svg
+
+#### Boot Synchronization (Syntax 8+)
+
+The *BootCardGroup* value in *ValueGlobals* allows multiple sound cards to coordinate
+their boot sequences. This value is detected at boot (alsactl/udev/systemd) time. Boot
+tools can provide boot synchronization information through a control element named
+'Boot' with 64-bit integer type. When present, the UCM library uses this control element
+to coordinate initialization timing.
+
+The 'Boot' control element contains:
+- **index 0**: Boot time in CLOCK_MONOTONIC_RAW (seconds)
+- **index 1**: Restore time in CLOCK_MONOTONIC_RAW (seconds)
+- **index 2**: Primary card number (identifies also group)
+
+The UCM open call waits until the boot timeout has passed or until restore state
+is notified through the synchronization Boot element. The timeout defaults to 30 seconds
+and can be customized using 'BootCardSyncTime' in 'ValueGlobals' (maximum 240 seconds).
+
+If the 'Boot' control element is not present, no boot synchronization is performed.
+
+Other cards in the group (primary card number is different) will have the "Linked"
+value set to "1", allowing UCM configuration files to detect and handle secondary
+cards appropriately.
+
+Example configuration:
+
+~~~{.html}
+ValueGlobals {
+  BootCardGroup "amd-acp"
+  BootCardSyncTime 10 # seconds
+}
+~~~
 
 ### Device volume
 
@@ -550,6 +759,14 @@ must define a *Condition* block and *True* or *False* blocks or both. The *True*
 blocks will be merged to the parent tree (where the *If* block is defined) when
 the *Condition* is evaluated.
 
+Starting with *Syntax* version *8*, *If* blocks can also include *Prepend* and *Append*
+configuration blocks. These blocks are always merged to the parent tree, independent of the
+condition evaluation result:
+- *Prepend* block is merged before the condition result (*True* or *False* block)
+- *Append* block is merged after the condition result (*True* or *False* block)
+- Both *Prepend* and *Append* can be specified simultaneously
+- When *Prepend* or *Append* is present, the *Condition* directive can be omitted
+
 Example:
 
 ~~~{.html}
@@ -562,6 +779,38 @@ If.uniqueid {
   True {
     Define.a a
     define.b b
+  }
+}
+~~~
+
+Example with Prepend and Append (*Syntax* version *8*+):
+
+~~~{.html}
+If.setup {
+  Prepend {
+    Define.before "prepended"
+  }
+  Condition {
+    Type AlwaysTrue
+  }
+  True {
+    Define.middle "conditional"
+  }
+  Append {
+    Define.after "appended"
+  }
+}
+~~~
+
+Example with Prepend/Append only (no Condition, *Syntax* version *8*+):
+
+~~~{.html}
+If.common {
+  Prepend {
+    Define.x "always executed"
+  }
+  Append {
+    Define.y "also always executed"
   }
 }
 ~~~
@@ -664,6 +913,78 @@ SectionDevice."Speaker" {
   }
 }
 ~~~
+
+### Device Variants
+
+Starting with **Syntax 8**, devices can define variants using the *DeviceVariant* block.
+Device variants provide a convenient way to define multiple related devices with different
+configurations (such as different channel counts) in a single device definition.
+
+When a device name contains a colon (':') character and the device configuration includes
+*DeviceVariant* blocks, the UCM parser handles variant configuration in two ways:
+
+1. **Primary device configuration**: If the text after the colon (variant label) matches a
+   variant identifier in the *DeviceVariant* block, that variant's configuration is merged
+   with the primary device configuration before parsing. This allows the primary device to
+   inherit base configuration while overriding specific values from the variant.
+
+2. **Additional variant devices**: The UCM parser automatically creates multiple distinct
+   UCM devices:
+   - The base device (with the name specified in the *Device* or *SectionDevice* block)
+   - One additional device for each *DeviceVariant* block
+
+Each variant device name is constructed by combining the base device name with the variant
+identifier. Variant devices are automatically added to the base device's conflicting device
+list, since these configurations are mutually exclusive (e.g., you cannot use 2.0, 5.1, and
+7.1 speaker configurations simultaneously).
+
+Example - Speaker with multiple channel configurations:
+
+~~~{.html}
+Device."Speaker:2.0" {
+  Value {
+    PlaybackChannels 2
+  }
+  DeviceVariant."5.1".Value {
+    PlaybackChannels 6
+  }
+  DeviceVariant."7.1".Value {
+    PlaybackChannels 8
+  }
+}
+~~~
+
+This configuration creates three UCM devices:
+- **Speaker:2.0** - 2 playback channels (base device)
+- **Speaker:5.1** - 6 playback channels (variant)
+- **Speaker:7.1** - 8 playback channels (variant)
+
+The variant devices (**Speaker:5.1** and **Speaker:7.1**) inherit all configuration from the
+base device and override only the values specified in their *DeviceVariant* block. The devices
+are automatically marked as conflicting with each other.
+
+Example - HDMI output with different sample rates:
+
+~~~{.html}
+SectionDevice."HDMI:LowRate" {
+  Comment "HDMI output - standard rate"
+  EnableSequence [
+    cset "name='HDMI Switch' on"
+  ]
+  Value {
+    PlaybackPCM "hw:${CardId},3"
+    PlaybackRate 48000
+  }
+  DeviceVariant."HighRate" {
+    Comment "HDMI output - high sample rate"
+    Value {
+      PlaybackRate 192000
+    }
+  }
+}
+~~~
+
+This creates two devices: **HDMI:LowRate** (48kHz) and **HDMI:HighRate** (192kHz).
 
 */
 
