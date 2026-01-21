@@ -10,4 +10,4 @@
 #define SND_LIB_VER(maj, min, sub) (((maj)<<16)|((min)<<8)|(sub))
 #define SND_LIB_VERSION SND_LIB_VER(SND_LIB_MAJOR, SND_LIB_MINOR, SND_LIB_SUBMINOR)
 /** library version (string) */
-#define SND_LIB_VERSION_STR	"1.2.15.1"
+#define SND_LIB_VERSION_STR	"1.2.15.3"

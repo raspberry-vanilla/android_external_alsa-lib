@@ -180,7 +180,7 @@
 #define PACKAGE_NAME "alsa-lib"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "alsa-lib 1.2.15.1"
+#define PACKAGE_STRING "alsa-lib 1.2.15.3"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "alsa-lib"
@@ -189,7 +189,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "1.2.15.1"
+#define PACKAGE_VERSION "1.2.15.3"
 
 /* Max number of cards */
 #define SND_MAX_CARDS 32
@@ -304,7 +304,7 @@
 
 
 /* sound library version string */
-#define VERSION "1.2.15.1"
+#define VERSION "1.2.15.3"
 
 /* compiled with versioned symbols */
 /* #undef VERSIONED_SYMBOLS */
