@@ -27,6 +27,8 @@ cc_library_shared {
         "-Wno-pointer-arith",
         "-Wno-pointer-bool-conversion",
         "-Wno-single-bit-bitfield-constant-conversion",
+        "-Wno-sometimes-uninitialized",
+        "-Wno-uninitialized",
         "-fPIC",
     ],
     required: ["libasound-config"],
