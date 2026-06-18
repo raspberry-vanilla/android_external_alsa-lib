@@ -1485,6 +1485,10 @@ static int parse_def(snd_config_t *parent, input_t *input, int skip, int overrid
 			endchr = ']';
 		}
 		c = get_nonwhite(input);
+		if (c < 0) {
+			err = c;
+			goto __end;
+		}
 		if (c != endchr) {
 			if (n)
 				snd_config_delete(n);
@@ -4443,7 +4447,7 @@ int snd_config_hook_load_for_all_cards(snd_config_t *root, snd_config_t *config,
 					goto __err;
 				}
 				while (1) {
-					char *s = strchr(driver, '.');
+					const char *s = strchr(driver, '.');
 					if (s == NULL)
 						break;
 					driver = s + 1;

@@ -35,7 +35,7 @@
 #include <stdbool.h>
 #include "use-case.h"
 
-#define SYNTAX_VERSION_MAX	8
+#define SYNTAX_VERSION_MAX	9
 
 #define MAX_CARD_SHORT_NAME	32
 #define MAX_CARD_LONG_NAME	80
@@ -300,9 +300,9 @@ void uc_mgr_stdout(const char *fmt, ...);
 
 const char *uc_mgr_sysfs_root(void);
 const char *uc_mgr_config_dir(int format);
-int uc_mgr_config_load_into(int format, const char *file, snd_config_t *cfg);
-int uc_mgr_config_load(int format, const char *file, snd_config_t **cfg);
-int uc_mgr_config_load_file(snd_use_case_mgr_t *uc_mgr,  const char *file, snd_config_t **cfg);
+int uc_mgr_config_load_into(int format, const char *file, snd_config_t *cfg, bool optional);
+int uc_mgr_config_load(int format, const char *file, snd_config_t **cfg, bool optional);
+int uc_mgr_config_load_file(snd_use_case_mgr_t *uc_mgr, const char *file, snd_config_t **cfg, bool optional);
 int uc_mgr_import_master_config(snd_use_case_mgr_t *uc_mgr);
 int uc_mgr_scan_master_configs(const char **_list[]);
 
@@ -352,7 +352,8 @@ int uc_mgr_add_value(struct list_head *base, const char *key, char *val);
 int uc_mgr_check_value(struct list_head *value_list, const char *identifier);
 
 const char *uc_mgr_get_variable(snd_use_case_mgr_t *uc_mgr,
-				const char *name);
+				const char *name,
+				bool show_err);
 
 int uc_mgr_set_variable(snd_use_case_mgr_t *uc_mgr,
 			const char *name,
@@ -383,6 +384,9 @@ int uc_mgr_evaluate_include(snd_use_case_mgr_t *uc_mgr,
 int uc_mgr_evaluate_condition(snd_use_case_mgr_t *uc_mgr,
 			      snd_config_t *parent,
 			      snd_config_t *cond);
+
+int uc_mgr_evaluate_repeat(snd_use_case_mgr_t *uc_mgr,
+			    snd_config_t *cfg);
 
 int uc_mgr_define_regex(snd_use_case_mgr_t *uc_mgr,
 			const char *name,

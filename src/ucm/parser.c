@@ -66,7 +66,7 @@ static void ucm_filename(char *fn, size_t fn_len, long version,
  *
  */
 int uc_mgr_config_load_file(snd_use_case_mgr_t *uc_mgr,
-			     const char *file, snd_config_t **cfg)
+			     const char *file, snd_config_t **cfg, bool optional)
 {
 	char filename[PATH_MAX];
 	int err;
@@ -74,9 +74,10 @@ int uc_mgr_config_load_file(snd_use_case_mgr_t *uc_mgr,
 	ucm_filename(filename, sizeof(filename), uc_mgr->conf_format,
 		     file[0] == '/' ? NULL : uc_mgr->conf_dir_name,
 		     file);
-	err = uc_mgr_config_load(uc_mgr->conf_format, filename, cfg);
+	err = uc_mgr_config_load(uc_mgr->conf_format, filename, cfg, optional);
 	if (err < 0) {
-		snd_error(UCM, "failed to open file %s: %d", filename, err);
+		if (!optional || (err != -ENOENT && err != -EACCES))
+			snd_error(UCM, "failed to open file %s: %d", filename, err);
 		return err;
 	}
 	return 0;
@@ -391,7 +392,7 @@ static int evaluate_define(snd_use_case_mgr_t *uc_mgr,
 	snd_config_iterator_t i, next;
 	snd_config_t *d, *n;
 	const char *id;
-	char *var, *s;
+	char *var, *s, *sid;
 	int err;
 
 	err = snd_config_search(cfg, "Define", &d);
@@ -427,8 +428,18 @@ static int evaluate_define(snd_use_case_mgr_t *uc_mgr,
 			snd_error(UCM, "value names starting with '@' are reserved for application variables");
 			return -EINVAL;
 		}
-		err = uc_mgr_set_variable(uc_mgr, id, s);
+		sid = (char *)id;
+		if (uc_mgr->conf_format >= 9) {
+			err = uc_mgr_get_substituted_value(uc_mgr, &sid, id);
+			if (err < 0) {
+				free(s);
+				return err;
+			}
+		}
+		err = uc_mgr_set_variable(uc_mgr, sid, s);
 		free(s);
+		if (id != sid)
+			free(sid);
 		if (err < 0)
 			return err;
 	}
@@ -495,7 +506,15 @@ static int evaluate_macro1(snd_use_case_mgr_t *uc_mgr,
 		err = snd_config_get_string(args, &s);
 		if (err < 0)
 			return err;
-		err = snd_config_load_string(&a, s, 0);
+		if (uc_mgr->conf_format < 9) {
+			err = snd_config_load_string(&a, s, 0);
+		} else {
+			err = uc_mgr_get_substituted_value(uc_mgr, &var2, s);
+			if (err >= 0) {
+				err = snd_config_load_string(&a, var2, 0);
+				free(var2);
+			}
+		}
 		if (err < 0)
 			return err;
 	} else if (snd_config_get_type(args) != SND_CONFIG_TYPE_COMPOUND) {
@@ -509,7 +528,7 @@ static int evaluate_macro1(snd_use_case_mgr_t *uc_mgr,
 		if (err < 0)
 			goto __err_path;
 		snprintf(name, sizeof(name), "__%s", id);
-		if (uc_mgr_get_variable(uc_mgr, name)) {
+		if (uc_mgr_get_variable(uc_mgr, name, false)) {
 			snd_error(UCM, "Macro argument '%s' is already defined", name);
 			goto __err_path;
 		}
@@ -711,9 +730,9 @@ int uc_mgr_evaluate_inplace(snd_use_case_mgr_t *uc_mgr,
 			    snd_config_t *cfg)
 {
 	long iterations = 10000;
-	int err1 = 0, err2 = 0, err3 = 0, err4 = 0, err5 = 0;
+	int err1 = 0, err2 = 0, err3 = 0, err4 = 0, err5 = 0, err6 = 0;
 
-	while (err1 == 0 || err2 == 0 || err3 == 0 || err4 == 0 || err5 == 0) {
+	while (err1 == 0 || err2 == 0 || err3 == 0 || err4 == 0 || err5 == 0 || err6 == 0) {
 		if (iterations == 0) {
 			snd_error(UCM, "Maximal inplace evaluation iterations number reached (recursive references?)");
 			return -EINVAL;
@@ -747,9 +766,12 @@ int uc_mgr_evaluate_inplace(snd_use_case_mgr_t *uc_mgr,
 			return err4;
 		if (err4 == 0)
 			continue;
-		err5 = evaluate_condition(uc_mgr, cfg);
+		err5 = uc_mgr_evaluate_repeat(uc_mgr, cfg);
 		if (err5 < 0)
 			return err5;
+		err6 = evaluate_condition(uc_mgr, cfg);
+		if (err6 < 0)
+			return err6;
 	}
 	return 0;
 }
@@ -804,7 +826,7 @@ static int parse_libconfig1(snd_use_case_mgr_t *uc_mgr, snd_config_t *cfg)
 	if (file) {
 		if (substfile) {
 			snd_config_t *cfg;
-			err = uc_mgr_config_load(uc_mgr->conf_format, file, &cfg);
+			err = uc_mgr_config_load_file(uc_mgr, file, &cfg, false);
 			if (err < 0)
 				return err;
 			err = uc_mgr_substitute_tree(uc_mgr, cfg);
@@ -823,7 +845,7 @@ static int parse_libconfig1(snd_use_case_mgr_t *uc_mgr, snd_config_t *cfg)
 			ucm_filename(filename, sizeof(filename), uc_mgr->conf_format,
 				     file[0] == '/' ? NULL : uc_mgr->conf_dir_name,
 				     file);
-			err = uc_mgr_config_load_into(uc_mgr->conf_format, filename, uc_mgr->local_config);
+			err = uc_mgr_config_load_into(uc_mgr->conf_format, filename, uc_mgr->local_config, false);
 			if (err < 0)
 				return err;
 		}
@@ -2928,7 +2950,7 @@ static int parse_master_section(snd_use_case_mgr_t *uc_mgr, snd_config_t *cfg,
 		if (file) {
 			snd_config_t *cfg;
 			/* load config from file */
-			err = uc_mgr_config_load_file(uc_mgr, file, &cfg);
+			err = uc_mgr_config_load_file(uc_mgr, file, &cfg, false);
 			if (err < 0)
 				goto __error;
 			/* parse the config */
@@ -2996,7 +3018,7 @@ static int parse_master_section(snd_use_case_mgr_t *uc_mgr, snd_config_t *cfg,
 				snd_config_t *cfg;
 				const char *fname = vfile ? vfile : file;
 				/* load config from file */
-				err = uc_mgr_config_load_file(uc_mgr, fname, &cfg);
+				err = uc_mgr_config_load_file(uc_mgr, fname, &cfg, false);
 				if (err >= 0) {
 					err = parse_verb_config(uc_mgr, id,
 								vcomment ? vcomment : comment,
@@ -3555,7 +3577,7 @@ static int load_toplevel_config(snd_use_case_mgr_t *uc_mgr,
 		return -ENOENT;
 	}
 
-	err = uc_mgr_config_load(2, filename, &tcfg);
+	err = uc_mgr_config_load(2, filename, &tcfg, false);
 	if (err < 0)
 		goto __error;
 
@@ -3565,7 +3587,7 @@ static int load_toplevel_config(snd_use_case_mgr_t *uc_mgr,
 	if (err < 0)
 		goto __error;
 
-	err = uc_mgr_config_load(uc_mgr->conf_format, filename, cfg);
+	err = uc_mgr_config_load(uc_mgr->conf_format, filename, cfg, false);
 	if (err < 0) {
 		snd_error(UCM, "could not parse configuration for card %s", uc_mgr->card_name);
 		goto __error;
@@ -3771,7 +3793,7 @@ int uc_mgr_scan_master_configs(const char **_list[])
 #endif
 			continue;
 
-		err = uc_mgr_config_load(2, filename, &cfg);
+		err = uc_mgr_config_load(2, filename, &cfg, false);
 		if (err < 0)
 			goto __err;
 		err = snd_config_search(cfg, "Syntax", &c);

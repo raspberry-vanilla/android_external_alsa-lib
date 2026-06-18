@@ -22,37 +22,42 @@
 #include "pcm_local.h"
 
 #ifndef NDEBUG
-/*
- * dump hw_params when $LIBASOUND_DEBUG is set to >= 1
- */
 static void dump_hw_params(snd_pcm_hw_params_t *params, const char *type,
 			   snd_pcm_hw_param_t var, unsigned int val, int err)
 {
-	const char *verbose = getenv("LIBASOUND_DEBUG");
 	snd_output_t *out;
+	const char *s;
+	char *p, *buf;
 
-	if (! verbose || ! *verbose || atoi(verbose) < 1)
+	if (!snd_lib_log_filter(SND_LOG_DEBUG, SND_ILOG_PCM_PARAMS, NULL))
 		return;
-	if (snd_output_stdio_attach(&out, stderr, 0) < 0)
-		return;
-	fprintf(stderr, "ALSA ERROR hw_params: %s (%s)\n",
-		type, snd_pcm_hw_param_name(var));
-	fprintf(stderr, "           value = ");
 	switch (var) {
 	case SND_PCM_HW_PARAM_ACCESS:
-		fprintf(stderr, "%s", snd_pcm_access_name(val));
+		s = snd_pcm_access_name(val);
 		break;
 	case SND_PCM_HW_PARAM_FORMAT:
-		fprintf(stderr, "%s", snd_pcm_format_name(val));
+		s = snd_pcm_format_name(val);
 		break;
 	case SND_PCM_HW_PARAM_SUBFORMAT:
-		fprintf(stderr, "%s", snd_pcm_subformat_name(val));
+		s = snd_pcm_subformat_name(val);
 		break;
 	default:
-		fprintf(stderr, "%u", val);
+		s = NULL;
 	}
-	fprintf(stderr, " : %s\n", snd_strerror(err));
+	if (snd_output_buffer_open(&out) < 0)
+		return;
 	snd_pcm_hw_params_dump(params, out);
+	snd_output_putc(out, '\0');
+	snd_output_buffer_string(out, &buf);
+	for (p = buf; *p; p++)
+		if (*p == '\n')
+			*p = '|';
+	if (s)
+		snd_debug(PCM_PARAMS, "hw_params: %s (%s), value = %s : %s {%s}",
+			  type, snd_pcm_hw_param_name(var), s, snd_strerror(err), buf);
+	else
+		snd_debug(PCM_PARAMS, "hw_params: %s (%s), value = %u : %s {%s}",
+			  type, snd_pcm_hw_param_name(var), val, snd_strerror(err), buf);
 	snd_output_close(out);
 }
 #else
@@ -1220,11 +1225,12 @@ void snd_pcm_hw_param_dump(const snd_pcm_hw_params_t *params,
 	if (hw_is_mask(var)) {
 		const snd_mask_t *mask = hw_param_mask_c(params, var);
 		if (snd_mask_empty(mask))
-			snd_output_puts(out, " NONE");
+			snd_output_puts(out, "NONE");
 		else if (snd_mask_full(mask))
-			snd_output_puts(out, " ALL");
+			snd_output_puts(out, "ALL");
 		else {
 			unsigned int k;
+			int sep = 0;
 			for (k = 0; k <= SND_MASK_MAX; ++k) {
 				if (snd_mask_test(mask, k)) {
 					const char *s;
@@ -1243,8 +1249,10 @@ void snd_pcm_hw_param_dump(const snd_pcm_hw_params_t *params,
 						s = NULL;
 					}
 					if (s) {
-						snd_output_putc(out, ' ');
+						if (sep)
+							snd_output_putc(out, ' ');
 						snd_output_puts(out, s);
+						sep = 1;
 					}
 				}
 			}

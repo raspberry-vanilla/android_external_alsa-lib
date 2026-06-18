@@ -1702,7 +1702,7 @@ const char *parse_open_variables(snd_use_case_mgr_t *uc_mgr, const char *name)
 {
 	const char *end, *id;
 	char *args, *var;
-	snd_config_t *cfg, *n;
+	snd_config_t *cfg = NULL, *n;
 	snd_config_iterator_t i, next;
 	char vname[128];
 	size_t l;
@@ -1739,7 +1739,8 @@ const char *parse_open_variables(snd_use_case_mgr_t *uc_mgr, const char *name)
 	}
 
 skip:
-	snd_config_delete(cfg);
+	if (cfg)
+		snd_config_delete(cfg);
 	return end + 3;
 }
 
@@ -1780,7 +1781,7 @@ int snd_use_case_mgr_open(snd_use_case_mgr_t **uc_mgr,
 		card_name = parse_open_variables(mgr, card_name);
 
 	/* Application developers: This argument is not supposed to be set for standard applications. */
-	if (uc_mgr_get_variable(mgr, "@InBoot"))
+	if (uc_mgr_get_variable(mgr, "@InBoot", false))
 		mgr->in_boot = true;
 
 	err = uc_mgr_card_open(mgr);
@@ -2378,7 +2379,8 @@ int snd_use_case_get_list(snd_use_case_mgr_t *uc_mgr,
 			  const char *identifier,
 			  const char **list[])
 {
-	char *str, *str1;
+	char *str;
+	const char *str1;
 	int err, i;
 
 	if (uc_mgr == NULL || identifier == NULL) {
@@ -2711,7 +2713,8 @@ int snd_use_case_geti(snd_use_case_mgr_t *uc_mgr,
 		      const char *identifier,
 		      long *value)
 {
-	char *str, *str1;
+	char *str;
+	const char *str1;
 	int err;
 
 	pthread_mutex_lock(&uc_mgr->mutex);
@@ -3013,7 +3016,8 @@ int snd_use_case_set(snd_use_case_mgr_t *uc_mgr,
 		     const char *identifier,
 		     const char *value)
 {
-	char *str, *str1;
+	char *str;
+	const char *str1;
 	int err = 0;
 
 	snd_trace(UCM, "{API call} set '%s'='%s'", identifier, value);

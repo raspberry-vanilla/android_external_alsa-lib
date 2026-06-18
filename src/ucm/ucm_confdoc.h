@@ -587,8 +587,8 @@ Evaluation order   | Configuration block | Evaluation restart
 2                  | Include             | Yes
 3                  | Variant             | Yes
 4                  | Macro               | Yes
-5                  | If                  | Yes
-
+5                  | Repeat              | Yes
+6                  | If                  | Yes
 
 ### Substitutions
 
@@ -616,6 +616,7 @@ ${var:\<str\>}         | UCM parser variable (set using a _Define_ block)
 ${eval:\<str\>}        | Evaluate expression like *($var+2)/3* [**Syntax 5**]
 ${find-card:\<str\>}   | Find a card - see _Find card substitution_ section
 ${find-device:\<str\>} | Find a device - see _Find device substitution_ section
+${info-card:\<str\>}   | Get card information - see _Card info substitution_ section [**Syntax 9**]
 
 General note: If two dollars '$$' instead one dolar '$' are used for the
 substitution identification, the error is ignored (e.g. file does not
@@ -662,6 +663,7 @@ Usage example:
 
 ~~~{.html}
 ${find-card:field=name,regex='^acp$',return=number}
+${find-card:field=$FieldName,regex=$Pattern,return=number}
 ~~~
 
 Arguments:
@@ -669,8 +671,8 @@ Arguments:
 Argument             | Description
 ---------------------|-----------------------
 return               | return value type (id, number), id is the default
-field                | field for the lookup (id, driver, name, longname, mixername, components)
-regex                | regex string for the field match
+field                | field for the lookup (id, driver, name, longname, mixername, components) or variable name ($var) [**Syntax 9**]
+regex                | regex string for the field match or variable name ($var) [**Syntax 9**]
 
 #### Find device substitution
 
@@ -678,16 +680,50 @@ Usage example:
 
 ~~~{.html}
 ${find-device:type=pcm,field=name,regex='DMIC'}
+${find-device:type=$DevType,stream=$StreamType,field=$FieldName,regex=$Pattern}
 ~~~
 
 Arguments:
 
 Argument             | Description
 ---------------------|-----------------------
-type                 | device type (pcm)
-stream               | stream type (playback, capture), playback is default
-field                | field for the lookup (id, name, subname)
-regex                | regex string for the field match
+type                 | device type (pcm) or variable name ($var) [**Syntax 9**]
+stream               | stream type (playback, capture), playback is default; variable name ($var) supported in **Syntax 9**
+field                | field for the lookup (id, name, subname) or variable name ($var) [**Syntax 9**]
+regex                | regex string for the field match or variable name ($var) [**Syntax 9**]
+
+#### Card info substitution
+
+This substitution retrieves information about a specific ALSA card by card number
+or card ID and returns the requested field value.
+
+Usage examples:
+
+~~~{.html}
+${info-card:card=0,field=name}
+${info-card:card=acp,field=driver}
+${info-card:card=PCH,field=longname}
+${info-card:card=$MyCard,field=$MyField}
+~~~
+
+Arguments:
+
+Argument             | Description
+---------------------|--------------------------------------------------
+card                 | card number (integer), card ID (string), or variable name ($var)
+field                | field to retrieve (number, id, driver, name, longname, mixername, components) or variable name ($var)
+
+The **card** parameter can be either a card number (e.g., 0, 1, 2), a card ID string (e.g., "PCH", "acp", "Intel"),
+or a variable name prefixed with $ (e.g., $CardId).
+
+The **field** parameter specifies which card information to return or can be a variable name prefixed with $ (e.g., $FieldName):
+- **number**: Card number (integer as string)
+- **id**: Card identifier
+- **driver**: Card driver name
+- **name**: Card short name
+- **longname**: Card long name
+- **mixername**: Mixer name
+- **components**: Card components
 
 
 ### Variable defines
@@ -702,19 +738,135 @@ Define {
 }
 ~~~
 
-The *DefineRegex* allows substring extraction like:
+The *DefineRegex* allows substring extraction using regular expressions (POSIX extended regex).
+It can match patterns in strings and extract matched substrings into UCM variables.
+
+#### DefineRegex Structure
 
 ~~~{.html}
-DefineRegex.rval {
-  Regex "(hello)|(regex)"
-  String "hello, it's my regex"
+DefineRegex.name {
+  String "text to match against"
+  Regex "regex_pattern"
+  Flags "e"
+  Scheme "first"
 }
 ~~~
 
-The result will be stored to variables *rval1* as *hello* and *rval2* as *regex* (every matched
-substrings are stored to a separate variable with the sequence number postfix.
+Field                | Description
+---------------------|---------------------
+String               | The input string to match the regex pattern against
+Regex                | POSIX extended regular expression pattern
+Flags                | Optional regex flags (see below)
+Scheme               | Matching scheme: "first" (default) or "all" [**Syntax 9**]
 
-Variables can be substituted using the `${var:rval1}` reference for example.
+#### Regex Flags
+
+The Flags field is optional and accepts the following characters:
+
+Flag   | Description
+-------|---------------------
+e      | Extended POSIX regex (REG_EXTENDED) - default recommended
+i      | Case-insensitive matching (REG_ICASE)
+s      | Report only success/fail (REG_NOSUB)
+n      | Newline-sensitive matching (REG_NEWLINE)
+
+Multiple flags can be combined, e.g., "ei" for extended and case-insensitive.
+
+#### Matching Schemes
+
+**Scheme "first"** (default): Matches the pattern once and extracts capture groups
+
+The variables created are:
+- `name` - the full matched string
+- `name1` - first capture group (parentheses in regex)
+- `name2` - second capture group
+- `nameN` - Nth capture group
+
+Example with "first" scheme:
+
+~~~{.html}
+DefineRegex.hwdev {
+  String "hw:2,0"
+  Regex "hw:([0-9]+),([0-9]+)"
+  Flags "e"
+  Scheme "first"
+}
+~~~
+
+This creates variables:
+- `hwdev` = "hw:2,0" (full match)
+- `hwdev1` = "2" (first capture group - card number)
+- `hwdev2` = "0" (second capture group - device number)
+
+**Scheme "all"** [**Syntax 9**]: Matches the pattern multiple times and extracts all matches
+
+The variables created are:
+- `nameN` - Nth full match (N starts at 1)
+- `nameN_1` - Nth match, first capture group
+- `nameN_2` - Nth match, second capture group
+- `nameN_M` - Nth match, Mth capture group
+
+Example with "all" scheme:
+
+~~~{.html}
+DefineRegex.devices {
+  String "device1 device2 device3"
+  Regex "device([0-9]+)"
+  Flags "e"
+  Scheme "all"
+}
+~~~
+
+This creates variables:
+- `devices1` = "device1" (first full match)
+- `devices1_1` = "1" (first match, capture group 1)
+- `devices2` = "device2" (second full match)
+- `devices2_1` = "2" (second match, capture group 1)
+- `devices3` = "device3" (third full match)
+- `devices3_1` = "3" (third match, capture group 1)
+
+#### Practical Examples
+
+Extract USB device vendor and product IDs:
+
+~~~{.html}
+DefineRegex.usbids {
+  String "${sys:bus/usb/devices/1-1/uevent}"
+  Regex "PRODUCT=([0-9a-f]+)/([0-9a-f]+)"
+  Flags "e"
+  Scheme "first"
+}
+# Creates: usbids (full match), usbids1 (vendor), usbids2 (product)
+~~~
+
+Parse multiple key=value pairs:
+
+~~~{.html}
+DefineRegex.params {
+  String "rate=48000,channels=2,format=S16_LE"
+  Regex "([a-z]+)=([^,]+)"
+  Flags "e"
+  Scheme "all"
+}
+# Creates: params1="rate=48000", params1_1="rate", params1_2="48000"
+#          params2="channels=2", params2_1="channels", params2_2="2"
+#          params3="format=S16_LE", params3_1="format", params3_2="S16_LE"
+~~~
+
+Extract text components:
+
+~~~{.html}
+DefineRegex.model {
+  String "USB Audio Device Model XYZ123"
+  Regex "([A-Z]+).*Model ([A-Z0-9]+)"
+  Flags "e"
+  Scheme "first"
+}
+# Creates: model (full match), model1="USB", model2="XYZ123"
+~~~
+
+Variables can be substituted using `${var:name}` reference. For example, to use the extracted
+card number: `PlaybackPCM "hw:${var:hwdev1},0"`
 
 ### Macros
 
@@ -878,6 +1030,32 @@ If.fmic {
 }
 ~~~
 
+#### Integer comparison (Type Integer)
+
+Field                | Description
+---------------------|-----------------------
+Operation            | comparison operator (==, !=, <, >, <=, >=)
+Value1               | first integer value (string converted to long long)
+Value2               | second integer value (string converted to long long)
+
+Note: Integer condition is supported in *Syntax* version *9*+.
+
+Example:
+
+~~~{.html}
+If.check_channels {
+  Condition {
+    Type Integer
+    Operation ">"
+    Value1 "${var:channels}"
+    Value2 "2"
+  }
+  True {
+    ...
+  }
+}
+~~~
+
 ### Variants
 
 To avoid duplication of the many configuration files for the cases with
@@ -985,6 +1163,136 @@ SectionDevice."HDMI:LowRate" {
 ~~~
 
 This creates two devices: **HDMI:LowRate** (48kHz) and **HDMI:HighRate** (192kHz).
+
+### Repetitive Pattern Substitution
+
+Starting with **Syntax 9**, the UCM configuration supports the **Repeat** block for generating
+repetitive configuration patterns. This feature allows you to apply a configuration block multiple
+times with different variable values, reducing duplication in configuration files.
+
+The **Repeat** block contains two main components:
+
+1. **Pattern**: Defines the iteration pattern (how many times to repeat and what values to use)
+2. **Apply**: The configuration block to be applied on each iteration
+
+#### Pattern Types
+
+The **Pattern** block supports two types: **Integer** and **Array**.
+
+**Integer Pattern**: Iterates over a range of integer values
+
+~~~{.html}
+Repeat.MyRepeat {
+  Pattern {
+    Variable 'ChannelNum'
+    Type Integer
+    First 0
+    Last 15
+    Step 2
+  }
+  Apply {
+    ... configuration using ${var:ChannelNum} ...
+  }
+}
+~~~
+
+Fields for Integer pattern:
+- **Variable**: Name of the variable to substitute (without ${var:} prefix)
+- **Type**: Must be "Integer"
+- **First**: Starting value (integer)
+- **Last**: Ending value (integer)
+- **Step**: Increment value (integer, default 1)
+
+The iteration supports reverse order automatically when First is greater than Last.
+
+**Array Pattern**: Iterates over a list of string values
+
+~~~{.html}
+Repeat.DeviceList {
+  Pattern {
+    Variable 'DevName'
+    Type Array
+    Array [
+      "Speaker"
+      "Headphones"
+      "HDMI"
+    ]
+  }
+  Apply {
+    ... configuration using ${var:DevName} ...
+  }
+}
+~~~
+
+Fields for Array pattern:
+- **Variable**: Name of the variable to substitute (without ${var:} prefix)
+- **Type**: Must be "Array"
+- **Array**: A compound node containing string values to iterate over
+
+**String Pattern**: Pattern can also be specified as a string that will be parsed as a
+configuration block. This allows for dynamic pattern generation.
+
+~~~{.html}
+Repeat.Dynamic {
+  Pattern "
+    Variable 'Index'
+    Type Integer
+    First 1
+    Last 4
+  "
+  Apply {
+    ... configuration using ${var:Index} ...
+  }
+}
+~~~
+
+#### Complete Example
+
+Example using Integer pattern to create multiple similar control settings:
+
+~~~{.html}
+EnableSequence [
+  Repeat.VolumeInit {
+    Pattern {
+      Variable 'ch'
+      Type Integer
+      First 0
+      Last 7
+    }
+    Apply {
+      cset "name='PCM Channel ${var:ch} Volume' 100%"
+    }
+  }
+]
+~~~
+
+This generates 8 cset commands for channels 0 through 7.
+
+Example using Array pattern for different device configurations:
+
+~~~{.html}
+Repeat.Devices {
+  Pattern {
+    Variable 'output'
+    Type Array
+    Array [
+      "Speaker"
+      "Headphones"
+      "LineOut"
+    ]
+  }
+  Apply {
+    SectionDevice."${var:output}" {
+      Comment "${var:output} Output"
+      EnableSequence [
+        cset "name='${var:output} Switch' on"
+      ]
+    }
+  }
+}
+~~~
+
+This creates three SectionDevice blocks for Speaker, Headphones, and LineOut.
 
 */
 

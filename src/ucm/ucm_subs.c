@@ -204,6 +204,92 @@ static char *rval_card_id_by_name(snd_use_case_mgr_t *uc_mgr, const char *id)
 	return strdup(snd_ctl_card_info_get_id(ctl_list->ctl_info));
 }
 
+static char *rval_card_info(snd_use_case_mgr_t *uc_mgr, const char *query)
+{
+	snd_config_t *config, *d;
+	const char *card_str, *field_str, *tmp;
+	struct ctl_list *ctl_list = NULL;
+	snd_ctl_card_info_t *info;
+	char *result = NULL;
+	long card_num;
+	int err;
+
+	if (uc_mgr->conf_format < 9) {
+		snd_error(UCM, "info-card substitution is supported in v9+ syntax");
+		return NULL;
+	}
+
+	err = snd_config_load_string(&config, query, 0);
+	if (err < 0) {
+		snd_error(UCM, "info-card: invalid arguments '%s'", query);
+		return NULL;
+	}
+
+	if (snd_config_search(config, "card", &d)) {
+		snd_error(UCM, "info-card: 'card' parameter is required");
+		goto __error;
+	}
+	if (snd_config_get_string(d, &card_str))
+		goto __error;
+
+	if (card_str[0] == '$') {
+		tmp = card_str + 1;
+		card_str = uc_mgr_get_variable(uc_mgr, tmp, true);
+		if (card_str == NULL)
+			goto __error;
+	}
+
+	if (snd_config_search(config, "field", &d)) {
+		snd_error(UCM, "info-card: 'field' parameter is required");
+		goto __error;
+	}
+	if (snd_config_get_string(d, &field_str))
+		goto __error;
+
+	if (field_str[0] == '$') {
+		tmp = field_str + 1;
+		field_str = uc_mgr_get_variable(uc_mgr, tmp, true);
+		if (field_str == NULL)
+			goto __error;
+	}
+
+	if (safe_strtol(card_str, &card_num) == 0)
+		ctl_list = uc_mgr_get_ctl_by_card(uc_mgr, (int)card_num);
+	if (ctl_list == NULL)
+		ctl_list = get_ctl_list_by_name(uc_mgr, card_str);
+	if (ctl_list == NULL) {
+		snd_error(UCM, "info-card: card '%s' not found", card_str);
+		goto __error;
+	}
+
+	info = ctl_list->ctl_info;
+
+	if (strcasecmp(field_str, "number") == 0) {
+		char num[16];
+		snprintf(num, sizeof(num), "%d", snd_ctl_card_info_get_card(info));
+		result = strdup(num);
+	} else if (strcasecmp(field_str, "id") == 0) {
+		result = strdup(snd_ctl_card_info_get_id(info));
+	} else if (strcasecmp(field_str, "driver") == 0) {
+		result = strdup(snd_ctl_card_info_get_driver(info));
+	} else if (strcasecmp(field_str, "name") == 0) {
+		result = strdup(snd_ctl_card_info_get_name(info));
+	} else if (strcasecmp(field_str, "longname") == 0) {
+		result = strdup(snd_ctl_card_info_get_longname(info));
+	} else if (strcasecmp(field_str, "mixername") == 0) {
+		result = strdup(snd_ctl_card_info_get_mixername(info));
+	} else if (strcasecmp(field_str, "components") == 0) {
+		result = strdup(snd_ctl_card_info_get_components(info));
+	} else {
+		snd_error(UCM, "info-card: unknown field '%s'", field_str);
+		result = NULL;
+	}
+
+__error:
+	snd_config_delete(config);
+	return result;
+}
+
 #ifndef DOC_HIDDEN
 typedef struct lookup_iterate *(*lookup_iter_fcn_t)
 			(snd_use_case_mgr_t *uc_mgr, struct lookup_iterate *iter);
@@ -235,7 +321,7 @@ static char *rval_lookup_main(snd_use_case_mgr_t *uc_mgr,
 	snd_config_t *config, *d;
 	struct lookup_fcn *fcn;
 	struct lookup_iterate *curr;
-	const char *s;
+	const char *s, *tmp;
 	char *result;
 	regmatch_t match[1];
 	regex_t re;
@@ -259,6 +345,12 @@ static char *rval_lookup_main(snd_use_case_mgr_t *uc_mgr,
 	}
 	if (snd_config_get_string(d, &s))
 		goto null;
+	if (s[0] == '$' && uc_mgr->conf_format >= 9) {
+		tmp = s + 1;
+		s = uc_mgr_get_variable(uc_mgr, tmp, true);
+		if (s == NULL)
+			goto null;
+	}
 	for (fcn = iter->fcns ; fcn; fcn++) {
 		if (strcasecmp(fcn->name, s) == 0) {
 			iter->fcn = fcn->fcn;
@@ -275,6 +367,12 @@ static char *rval_lookup_main(snd_use_case_mgr_t *uc_mgr,
 	}
 	if (snd_config_get_string(d, &s))
 		goto null;
+	if (s[0] == '$' && uc_mgr->conf_format >= 9) {
+		tmp = s + 1;
+		s = uc_mgr_get_variable(uc_mgr, tmp, true);
+		if (s == NULL)
+			goto null;
+	}
 	err = regcomp(&re, s, REG_EXTENDED | REG_ICASE);
 	if (err) {
 		snd_error(UCM, "Regex '%s' compilation failed (code %d)", s, err);
@@ -410,7 +508,8 @@ static char *rval_pcm_lookup_return(struct lookup_iterate *iter,
 	return strdup(num);
 }
 
-static int rval_pcm_lookup_init(struct lookup_iterate *iter,
+static int rval_pcm_lookup_init(snd_use_case_mgr_t *uc_mgr,
+				struct lookup_iterate *iter,
 				snd_config_t *config)
 {
 	static struct lookup_fcn pcm_fcns[] = {
@@ -420,12 +519,18 @@ static int rval_pcm_lookup_init(struct lookup_iterate *iter,
 		{ 0 },
 	};
 	snd_config_t *d;
-	const char *s;
+	const char *s, *tmp;
 	snd_pcm_info_t *pcminfo;
 	snd_pcm_stream_t stream = SND_PCM_STREAM_PLAYBACK;
 
 	if (snd_config_search(config, "stream", &d) == 0 &&
 	    snd_config_get_string(d, &s) == 0) {
+		if (s[0] == '$' && uc_mgr->conf_format >= 9) {
+			tmp = s + 1;
+			s = uc_mgr_get_variable(uc_mgr, tmp, true);
+			if (s == NULL)
+				return -EINVAL;
+		}
 		if (strcasecmp(s, "playback") == 0)
 			stream = SND_PCM_STREAM_PLAYBACK;
 		else if (strcasecmp(s, "capture") == 0)
@@ -454,13 +559,14 @@ static int rval_device_lookup_init(snd_use_case_mgr_t *uc_mgr,
 {
 	static struct {
 		const char *name;
-		int (*init)(struct lookup_iterate *iter, snd_config_t *config);
+		int (*init)(snd_use_case_mgr_t *uc_mgr, struct lookup_iterate *iter,
+			    snd_config_t *config);
 	} *t, types[] = {
 		{ .name = "pcm", .init = rval_pcm_lookup_init },
 		{ 0 }
 	};
 	snd_config_t *d;
-	const char *s;
+	const char *s, *tmp;
 	int err;
 
 	if (snd_config_search(config, "ctl", &d) || snd_config_get_string(d, &s)) {
@@ -480,9 +586,15 @@ static int rval_device_lookup_init(snd_use_case_mgr_t *uc_mgr,
 		snd_error(UCM, "Missing device type!");
 		return -EINVAL;
 	}
+	if (s[0] == '$' && uc_mgr->conf_format >= 9) {
+		tmp = s + 1;
+		s = uc_mgr_get_variable(uc_mgr, tmp, true);
+		if (s == NULL)
+			return -EINVAL;
+	}
 	for (t = types; t->name; t++)
 		if (strcasecmp(t->name, s) == 0)
-			return t->init(iter, config);
+			return t->init(uc_mgr, iter, config);
 	snd_error(UCM, "Device type '%s' is invalid", s);
 	return -EINVAL;
 }
@@ -726,7 +838,7 @@ static char *rval_var(snd_use_case_mgr_t *uc_mgr, const char *id)
 	} else if (id[0] == '@') {
 		ignore_not_found = true;
 	}
-	v = uc_mgr_get_variable(uc_mgr, id);
+	v = uc_mgr_get_variable(uc_mgr, id, false);
 	if (v == NULL && ignore_not_found)
 		v = "";
 	if (v)
@@ -742,7 +854,7 @@ static int rval_eval_var_cb(snd_config_t **dst, const char *s, void *private_dat
 	snd_use_case_mgr_t *uc_mgr = private_data;
 	const char *v;
 
-	v = uc_mgr_get_variable(uc_mgr, s);
+	v = uc_mgr_get_variable(uc_mgr, s, false);
 	if (v == NULL)
 		return -ENOENT;
 	return snd_config_imake_string(dst, NULL, v);
@@ -826,7 +938,7 @@ static int rval_evali(snd_use_case_mgr_t *uc_mgr, snd_config_t *node, const char
  */
 static inline const char *strchr_with_escape(const char *str, char c)
 {
-	char *s;
+	const char *s;
 
 	while (1) {
 		s = strchr(str, c);
@@ -913,6 +1025,7 @@ __std:
 		MATCH_VARIABLE2(value, "${eval:", rval_eval, false);
 		MATCH_VARIABLE2(value, "${find-card:", rval_card_lookup, false);
 		MATCH_VARIABLE2(value, "${find-device:", rval_device_lookup, false);
+		MATCH_VARIABLE2(value, "${info-card:", rval_card_info, false);
 		MATCH_VARIABLE2(value, "${CardNumberByName:", rval_card_number_by_name, false);
 		MATCH_VARIABLE2(value, "${CardIdByName:", rval_card_id_by_name, false);
 __merr:
@@ -939,7 +1052,7 @@ __match2:
 			if (*v2 == '$' && uc_mgr->conf_format >= 3) {
 				if (strncmp(value, "${eval:", 7) == 0)
 					goto __direct_fcn2;
-				tmp = uc_mgr_get_variable(uc_mgr, v2 + 1);
+				tmp = uc_mgr_get_variable(uc_mgr, v2 + 1, false);
 				if (tmp == NULL) {
 					snd_error(UCM, "define '%s' is not reachable in this context!", v2 + 1);
 					rval = NULL;

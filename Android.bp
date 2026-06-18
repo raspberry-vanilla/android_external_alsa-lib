@@ -15,19 +15,19 @@ cc_library_shared {
     ],
     exclude_srcs: [
         "src/control/ctl_symbols_list.c",
-        "src/pcm/scopes/*.c",
         "src/pcm/pcm_dmix_generic.c",
         "src/pcm/pcm_dmix_i386.c",
         "src/pcm/pcm_dmix_x86_64.c",
         "src/pcm/pcm_symbols_list.c",
+        "src/pcm/scopes/*.c",
     ],
     cflags: [
-        "-O2",
         "-DPIC",
-        "-fPIC",
+        "-O2",
         "-Wno-pointer-arith",
         "-Wno-pointer-bool-conversion",
         "-Wno-single-bit-bitfield-constant-conversion",
+        "-fPIC",
     ],
     required: ["libasound-config"],
 }
